@@ -17,18 +17,15 @@ class RawBehavior:
         self.file_string=''
         
         for file in os.listdir(exp_folder):
-            if file.endswith(".avi"):
+            if file.endswith(".mp4"):
                 # We check if the file is accessible but we do not load it
-                    self.file_string = os.path.join(exp_folder, file)
-                    self.data_pointer = cv2.VideoCapture(self.file_string)
+                self.file_string = os.path.join(exp_folder, file)
+                self.data_pointer = cv2.VideoCapture(self.file_string)
 
             else:
                 continue
 
-        if os.path.isfile(self.file_string):
-            self.data_present = True
-        else:
-            self.data_present = False
+        self.data_present = os.path.isfile(self.file_string)
         
     def is_valid(self):
         return self.data_present
