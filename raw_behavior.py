@@ -29,13 +29,6 @@ class RawBehavior:
             self.data_present = True
         else:
             self.data_present = False
-     
-    def __del__(self):
-        # We remove temporary files if present
-        if hasattr(self,'data_pointer'):
-            self.data_pointer=[]
-            if self.delete_tmp:
-                os.remove(self.tmp_file_string)         
         
     def is_valid(self):
         return self.data_present
