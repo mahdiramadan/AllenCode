@@ -12,25 +12,18 @@ import cv2
 from PIL import Image, ImageDraw
 
 class RawBehavior:
-    def __init__(self, exp_folder, tmp_folder='C:\\Tmp\\'):         
+    def __init__(self, exp_folder):
         
         self.file_string=''
-        self.tmp_folder=tmp_folder
         
         for file in os.listdir(exp_folder):
             if file.endswith(".avi"):
                 # We check if the file is accessible but we do not load it
-                self.file_string=os.path.join(exp_folder,file)
-                tmp_filename=os.path.splitext(file)[0]
-                file_string_avi = os.path.join(exp_folder,tmp_filename)
-                
-                if os.path.isfile(file_string_avi):
-                    self.tmp_file_string = file_string_avi
-                    self.data_pointer = cv2.VideoCapture(self.tmp_file_string)
-                    self.delete_tmp = False
-                else:
-                    self.tmp_file_string=os.path.join(self.tmp_folder,tmp_filename)
-                    self.delete_tmp = True
+                    self.file_string = os.path.join(exp_folder, file)
+                    self.data_pointer = cv2.VideoCapture(self.file_string)
+
+            else:
+                continue
 
         if os.path.isfile(self.file_string):
             self.data_present = True
