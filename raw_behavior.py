@@ -5,7 +5,7 @@ Created on Tue Oct 20 13:49:10 2015
 """
 import pandas as pd
 import os
-import ophyse.mathfcn as mf
+import mathfcn as mf
 import matplotlib.pyplot as plt
 import numpy as np 
 import cv2
