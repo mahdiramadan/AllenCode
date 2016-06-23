@@ -8,4 +8,4 @@ from raw_behavior import RawBehavior as rb
 
 raw = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/videos")
 
-raw.get_image()
+print(raw.get_xy_size())
