@@ -13,9 +13,10 @@ from PIL import Image, ImageDraw
 
 class RawBehavior:
     def __init__(self, exp_folder):
-        
+        self.count= 0
         self.file_string=''
-        
+        self.vidPath = exp_folder
+
         for file in os.listdir(exp_folder):
             if file.endswith(".mp4"):
                 # We check if the file is accessible but we do not load it
@@ -296,6 +297,11 @@ class RawBehavior:
         
         
         return fig1
+
+    def get_file_count(self):
+        for file in os.listdir(self.vidPath):
+            self.count= self.count +1
+        return self.count
 
 
 
