@@ -303,5 +303,10 @@ class RawBehavior:
             self.count= self.count +1
         return self.count
 
+    def get_video_count(self):
+        for file in os.listdir(self.vidPath):
+            if file.endswith(".mp4"):
+                self.count = self.count + 1
+        return self.count
 
 
