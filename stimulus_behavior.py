@@ -141,6 +141,7 @@ class StimulusBehavior:
         return x
 
     def get_stim_duration_seconds(self):
+        #duration is precise down to +-0.99 seconds (due to .frames at end of seconds)
         duration = self.get_stop_date()-self.get_start_date()
         return float(duration.seconds)
         
