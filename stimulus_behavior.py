@@ -132,12 +132,14 @@ class StimulusBehavior:
         
     def get_start_date(self):
         self.load_data_pointer()
-        return  datetime.strptime(self.data_pointer['startdatetime'],'%Y-%m-%d %H:%M:%S.%f')
+        x = self.data_pointer['startdatetime']
+        return x
 
     def get_stop_date(self):
         self.load_data_pointer()
-        return  datetime.strptime(self.data_pointer['stopdatetime'],'%Y-%m-%d %H:%M:%S.%f')
-        
+        x= self.data_pointer['stopdatetime']
+        return x
+
     def get_stim_duration_seconds(self):
         duration = self.get_stop_date()-self.get_start_date()
         return float(duration.seconds)
