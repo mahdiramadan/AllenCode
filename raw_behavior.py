@@ -311,5 +311,4 @@ class RawBehavior:
                 self.count = self.count + 1
         return self.count
 
-    def get_data_pointer(self):
-        return self.data_pointer
+    
