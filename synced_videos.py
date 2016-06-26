@@ -6,32 +6,27 @@ Created on Tue Oct 20 13:49:10 2015
 """
 import pandas as pd
 import os.path
-import ophyse.video_sync as vs
+import video_sync as vs
 import numpy as np
 import cv2
+# import raw_physio_data_flow
+# import corr_physio_data_flow
+# import aver_physio_data_flow
+from raw_behavior import RawBehavior as rb
+# import eye_tracking_video_flow
+from sync_meta import SyncMeta
+# import stimulus_behavior
 
 class SyncedVideos:
-    def __init__(self, raw_physio_data_flow, corr_physio_data_flow, aver_physio_data_flow, behavior_data_flow, eye_tracking_video_flow, sync_meta_flow, stimulus_behavior):  
+    def __init__(self):
         
-        self.raw_physio_data_flow = raw_physio_data_flow
-        self.corr_physio_data_flow = corr_physio_data_flow
-        self.aver_physio_data_flow = aver_physio_data_flow
-        self.behavior_data_flow = behavior_data_flow
-        self.eye_tracking_data_flow = eye_tracking_video_flow
-        self.sync_meta_flow = sync_meta_flow
-        self.stimulus_behavior = stimulus_behavior
-
-        if (not(raw_physio_data_flow.is_valid()) 
-            or not (corr_physio_data_flow.is_valid()) 
-            or not (aver_physio_data_flow.is_valid()) 
-            or not (eye_tracking_video_flow.is_valid()) 
-            or not (behavior_data_flow.is_valid())
-            or not (stimulus_behavior.is_valid())
-            or not (sync_meta_flow.is_valid())):
-                
-            self.data_present = False
-        else:
-            self.data_present = True
+        # self.raw_physio_data_flow = raw_physio_data_flow
+        # self.corr_physio_data_flow = corr_physio_data_flow
+        # self.aver_physio_data_flow = aver_physio_data_flow
+        self.behavior_data_flow = rb
+        # self.eye_tracking_data_flow = eye_tracking_video_flow
+        self.sync_meta_flow = SyncMeta
+        # self.stimulus_behavior = stimulus_behavior
 
     def is_valid(self):
         return self.data_present
@@ -214,8 +209,8 @@ class SyncedVideos:
                     
                 def scale_picture_physio(tmp): 
                     return scale_picture(tmp, top_raw_physio_range, bottom_raw_physio_range, 4095) 
-                def scale_picture_behavior(tmp): 
-                    return scale_picture(tmp, top_behav_range, bottom_behav_range, 255)
+                def scale_picture_behavior(tmp, value):
+                    return scale_picture(tmp, top_behav_range, bottom_behav_range, value)
                 def scale_picture_eye_tracking(tmp): 
                     return scale_picture(tmp, top_eye_tracking_range, bottom_eye_tracking_range, 255)
                     
@@ -225,3 +220,31 @@ class SyncedVideos:
                 all_videos.add_stream(synced_eye_tracking, 2, 2, frame_callback = scale_picture_eye_tracking)
                 
                 all_videos.write_movie(fname, start_frame = start_frame, max_frame = max_frame)
+
+    def video_annotation(self, exp_folder):
+
+        file_name = rb(exp_folder).get_file_string()
+        data_pointer = cv2.VideoCapture(file_name)
+        fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
+        nFrames = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        frameWidth = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+        frameHeight = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+        fourcc = cv2.cv.CV_FOURCC(*'mp4v')
+        out = cv2.VideoWriter('output.mp4', fourcc, fps, (frameWidth, frameHeight))
+        ret, frame = data_pointer.read()
+
+        while ret:
+
+            frame_count = int(data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))
+            cv2.putText(img=frame,
+                        text=str(frame_count),
+                        org=(500, 130),
+                        fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                        fontScale=3,
+                        color=(0, 255, 0),
+                        thickness=2,
+                        lineType=cv2.CV_AA)
+
+            out.write(frame)
+            ret, frame = data_pointer.read()
+
