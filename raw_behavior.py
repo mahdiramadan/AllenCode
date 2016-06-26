@@ -299,14 +299,17 @@ class RawBehavior:
         return fig1
 
     def get_file_count(self):
+        #returns the number of files in the directory folder
         for file in os.listdir(self.vidPath):
             self.count= self.count +1
         return self.count
 
     def get_video_count(self):
+        #returns the number of .mp4 videos in the directory folder
         for file in os.listdir(self.vidPath):
             if file.endswith(".mp4"):
                 self.count = self.count + 1
         return self.count
 
-
+    def get_data_pointer(self):
+        return self.data_pointer
