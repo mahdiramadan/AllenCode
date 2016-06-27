@@ -222,7 +222,7 @@ class SyncedVideos:
                 all_videos.write_movie(fname, start_frame = start_frame, max_frame = max_frame)
 
     def video_annotation(self, exp_folder):
-
+        # outputs a .mp4 video, sped up x 2, with displayed frame count in upper right.
         file_name = rb(exp_folder).get_file_string()
         data_pointer = cv2.VideoCapture(file_name)
         fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
@@ -230,6 +230,7 @@ class SyncedVideos:
         frameWidth = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         frameHeight = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.cv.CV_FOURCC(*'mp4v')
+        #change 3rd parameter of out function for different playback speeds
         out = cv2.VideoWriter('output.mp4', fourcc, fps*2, (frameWidth, frameHeight))
         ret, frame = data_pointer.read()
 
