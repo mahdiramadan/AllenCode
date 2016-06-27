@@ -311,4 +311,5 @@ class RawBehavior:
                 self.count = self.count + 1
         return self.count
 
-    
+    def get_file_string(self):
+        return self.file_string
