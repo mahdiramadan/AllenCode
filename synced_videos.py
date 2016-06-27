@@ -230,7 +230,7 @@ class SyncedVideos:
         frameWidth = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         frameHeight = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.cv.CV_FOURCC(*'mp4v')
-        out = cv2.VideoWriter('output.mp4', fourcc, fps, (frameWidth, frameHeight))
+        out = cv2.VideoWriter('output.mp4', fourcc, fps*2, (frameWidth, frameHeight))
         ret, frame = data_pointer.read()
 
         while ret:
@@ -238,9 +238,9 @@ class SyncedVideos:
             frame_count = int(data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))
             cv2.putText(img=frame,
                         text=str(frame_count),
-                        org=(500, 130),
+                        org=(480, 130),
                         fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                        fontScale=3,
+                        fontScale=2,
                         color=(0, 255, 0),
                         thickness=2,
                         lineType=cv2.CV_AA)
