@@ -203,12 +203,11 @@ class StimulusBehavior:
         plt.plot(walking_speed_cm)
         plt.xlabel("Frames")
         plt.ylabel("wheel speed (cm/s)")
-        fig1=plt.gcf()      
-        
+        fig1=plt.gcf()
         return fig1
 
     def raw_mouse_wheel(self):
-        #returns ndarray of the raw wheel rotation data
+        # returns ndarray of the raw wheel rotation data
         self.load_data_pointer()
         walking_speed = self.data_pointer['items']['foraging']['encoders'][0]['dx']
         walking_speed_cm = ((walking_speed / 360) * 5.5036 * np.pi * 2) / (1 / self.data_pointer['fps'])

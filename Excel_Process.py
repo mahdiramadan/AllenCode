@@ -1,4 +1,4 @@
-"""Excel_process.py by Mahdi Ramadan, 06-27-2016
+"""excel_process.py by Mahdi Ramadan, 06-27-2016
 This program will be used to index and extrapolate data from excel files
 containing behavior annotation data
 """
