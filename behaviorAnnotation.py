@@ -18,7 +18,7 @@ class DataAnalysis:
         #
         for file in os.listdir(exp_folder):
             if file.endswith(".mp4"):
-                # We check if the file is accessible but we do not load it
+                # set up objects with parameters to be used
                 self.directory = exp_folder
                 self.file_string = os.path.join(exp_folder, file)
                 self.data_pointer = cv2.VideoCapture(self.file_string)
@@ -36,8 +36,9 @@ class DataAnalysis:
 
 
 
-DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
+# Actual running script
 
+DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
 data = DataAnalysis.sb.raw_mouse_wheel()
 
 
