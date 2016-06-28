@@ -6,28 +6,41 @@ Referred to as behaviorAnnotation(1) by pycharm IDE
 
 from raw_behavior import RawBehavior as rb
 from stimulus_behavior import StimulusBehavior as sb
-from synced_videos import SyncedVideos
+from synced_videos import SyncedVideos as sv
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import os
+import cv2
 
-# class DataAnalysis:
-#     def __init__(self):
-#         #input acronym name of script wanted, and full method name
-#         self.directory = "/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos"
-#         self.data_available = os.path.isfile(self.directory)
-#         rb = rb(self.directory)
-#         sb = sb(self.directory)
-#         sv = sv(self.directory)
-#
-#     def data_valid(self):
-#         return self.data_available
-#
-#     def execute_method(self,type,method):
-#         return type + "."+ method +()
+class DataAnalysis:
+    def __init__(self,exp_folder):
+        #
+        for file in os.listdir(exp_folder):
+            if file.endswith(".mp4"):
+                # We check if the file is accessible but we do not load it
+                self.directory = exp_folder
+                self.file_string = os.path.join(exp_folder, file)
+                self.data_pointer = cv2.VideoCapture(self.file_string)
+                self.rb = rb(exp_folder)
+                self.sb = sb(exp_folder)
+                self.sv = sv(exp_folder)
 
-stim = SyncedVideos()
-stim.video_annotation("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
+            else:
+                continue
+
+        self.data_present = os.path.isfile(self.file_string)
+
+    def data_valid(self):
+        return self.data_available
+
+
+
+DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
+
+data = DataAnalysis.sb.raw_mouse_wheel()
+
+
 
 
 
