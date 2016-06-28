@@ -7,12 +7,13 @@ Referred to as behaviorAnnotation by pycharm IDE
 from raw_behavior import RawBehavior as rb
 from stimulus_behavior import StimulusBehavior as sb
 from synced_videos import SyncedVideos as sv
-from E
+from excel_processing import ExcelProcessing as ep
 import matplotlib.pyplot as plt
 import numpy as np
 import math
 import os
 import cv2
+import sys
 import pandas
 
 class DataAnalysis:
@@ -27,6 +28,7 @@ class DataAnalysis:
                 self.rb = rb(exp_folder)
                 self.sb = sb(exp_folder)
                 self.sv = sv(exp_folder)
+                self.ep = ep(exp_folder)
 
 
             else:
@@ -41,11 +43,15 @@ class DataAnalysis:
 
 # Actual running script
 
-# input directory to files of interest
+# input directory to files of interest!
 DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
-data = DataAnalysis.sb.raw_mouse_wheel()
 
+# data labels for annotation are: "ID", "From", "To", "chattering", "down", "grooming", "moving", "relaxed"
+# "running", "startle", "tailrelaxed", "tailtense", "tense", "up", "walking"
 
+data = DataAnalysis.ep.get_0_frames("walking")
+
+print(data)
 
 
 
