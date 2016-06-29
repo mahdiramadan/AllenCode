@@ -48,7 +48,44 @@ class ExcelProcessing:
         column_length = len(self.get_categories())
         return (ID_length, column_length)
 
+    def get_from(self):
+        # returns "from" frames data
+        f = self.data['From']
+        return f
+
+    def get_to(self):
+        # returns "to" frames data
+        f = self.data['To']
+        return f
+
     def get_0_frames(self, label):
         data = self.get_column(label)
-        return type(data)
+        count = 0
+        frames = [[], []]
+        for i in data:
+            if i == 0:
+                frames[0].append(self.get_from()[count])
+                frames[1].append(self.get_to()[count])
+                count += 1
 
+            else:
+                count += 1
+                continue
+
+        return frames
+
+    def get_1_frames(self, label):
+        data = self.get_column(label)
+        count = 0
+        frames = [[], []]
+        for i in data:
+            if i == 1:
+                frames[0].append(self.get_from()[count])
+                frames[1].append(self.get_to()[count])
+                count += 1
+
+            else:
+                count += 1
+                continue
+
+        return frames
