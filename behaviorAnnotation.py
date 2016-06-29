@@ -8,6 +8,7 @@ from raw_behavior import RawBehavior as rb
 from stimulus_behavior import StimulusBehavior as sb
 from synced_videos import SyncedVideos as sv
 from excel_processing import ExcelProcessing as ep
+from lims_database import LimsDatabase as ld
 import matplotlib.pyplot as plt
 import numpy as np
 import math
@@ -17,41 +18,33 @@ import sys
 import pandas
 
 class DataAnalysis:
-    def __init__(self,exp_folder):
+    def __init__(self,exp_folder, lims_ID):
         #
-        for file in os.listdir(exp_folder):
-            if file.endswith(".mp4"):
                 # set up objects with parameters to be used
-                self.directory = exp_folder
-                self.file_string = os.path.join(exp_folder, file)
-                self.data_pointer = cv2.VideoCapture(self.file_string)
                 self.rb = rb(exp_folder)
                 self.sb = sb(exp_folder)
                 self.sv = sv(exp_folder)
                 self.ep = ep(exp_folder)
-
-
-            else:
-                continue
-
-        self.data_present = os.path.isfile(self.file_string)
-
-    def data_valid(self):
-        return self.data_available
-
-
+                # self.ld = ld(lims_ID)
 
 # Actual running script
 
-# input directory to files of interest!
-DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos")
+# videos on this laptop stored in "/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos"
+# example LIMS ID is 501021421
 
-# data labels for annotation are: "ID", "From", "To", "chattering", "down", "grooming", "moving", "relaxed"
-# "running", "startle", "tailrelaxed", "tailtense", "tense", "up", "walking"
+# input LIMS ID or directory to files of interest!
+# RawBehavior, Stimulusbehavior, SyncedVideos, ExcelProcessing take in video directory
+# LimsDatabase takes in LIMS ID
 
-data = DataAnalysis.ep.get_0_frames("walking")
+# initializes all DataAnalysis objects, takes video directory and lims ID
+DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos", "501021421")
 
-print(data)
+# data labels for annotation are: "ID", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
+# "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"
+
+data = DataAnalysis.sv.video_annotation()
+
+
 
 
 
