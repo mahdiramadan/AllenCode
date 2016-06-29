@@ -9,7 +9,8 @@ import psycopg2
 import os
 import matplotlib.pylab as plt
 import numpy as np
-import ophyse
+# uncommented "import ophyse" due to path errors
+# import ophyse
 
 class LimsDatabase:
     def __init__(self, lims_id):            
@@ -155,7 +156,7 @@ class LimsDatabase:
                 
     def get_datafolder(self):
         if not(hasattr(self,'data_folder')):
-            data_folder=self.data_pointer[2]
+            data_folder = self.data_pointer[2]
             
             # We need to convert internal storage path to real path on titan
             data_folder=data_folder.replace('/','\\')
@@ -396,4 +397,6 @@ class LimsDatabase:
                 plt.axis('off')
                 plt.imshow(local_im)        
         return fig1
-        
+
+    def get_video_directory(self):
+        return self.get_datafolder()
