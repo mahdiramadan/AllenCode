@@ -14,13 +14,18 @@ class ExcelProcessing:
     def __init__(self, exl_folder):
 
         for file in os.listdir(exl_folder):
+            # looks for the excel file and makes the directory to it
             if file.endswith(".xlsx") and not file.startswith("~$"):
                 self.directory = exl_folder
                 self.file_string = os.path.join(exl_folder, file)
-                # uploads as a DataFrame type
+
+                # excel uploads as a DataFrame type
+                # IMPORTANT: zero based excel indexing starts with first row of numbered DATA, not the column labels.
+                # This means row zero is the first row of actual Data, not the column labels
                 self.data = pandas.read_excel(self.file_string)
                 # get video directory and name
                 file_name = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos").get_file_string()
+                # data pointer to the behavior video annotated
                 self.data_pointer = cv2.VideoCapture(file_name)
 
             else:
@@ -36,8 +41,21 @@ class ExcelProcessing:
         ID = self.data['ID']
         return ID
 
-    # IMPORTANT: indexing starts with first row of data at zero. Thus, the ID number and index
-    # number of a data point are offset by one
+    def frames_continuous(self):
+        # this method checks to see if the labeled frames are continuous. Make sure the labeled frame data is continuous
+        # for the rest of the code to work!
+        # gets the to and from frames
+        To_frames = self.get_to()
+        From_frames = self.get_from()
+
+        # for the each iteration, check whether the "to" frame is equal to the "from" frame in the next row
+        for k in range(len(From_frames)-1):
+            if To_frames[k] != From_frames[k+1]:
+                return "Frames are not continuous!"
+            else:
+                continue
+        return "Frames are continuous!"
+
 
 
     def get_column(self, label):
@@ -73,11 +91,12 @@ class ExcelProcessing:
         if data[index] == 1:
             return 1
 
-    def get_0_frames(self, label):
-        # returns all the frames that the label specified was equal to zero
+    def get_zero_frames_range(self, label):
+        # returns all the frame ranges that the label specified was equal to zero
         data = self.get_column(label)
         count = 0
         frames = [[], []]
+        # first column is all the From frames, second is all the To frames
         for i in data:
             if i == 0:
                 frames[0].append(self.get_from()[count])
@@ -90,11 +109,12 @@ class ExcelProcessing:
 
         return frames
 
-    def get_1_frames(self, label):
-        # returns all the frames that the label specified was equal to one
+    def get_one_frames_range(self, label):
+        # returns all the frame ranges that the label specified was equal to one
         data = self.get_column(label)
         count = 0
         frames = [[], []]
+        # first column is all the From frames, second is all the To frames
         for i in data:
             if i == 1:
                 frames[0].append(self.get_from()[count])
@@ -133,7 +153,7 @@ class ExcelProcessing:
         frame_data = self.get_per_frame_data()
         # iterates through each row
         for i in range(self.get_first_frame(), self.get_last_frame()+1):
-            # prints frame number
+            # prints frame number on frame
             cv2.putText(img=frame,
                         text=str(int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))),
                         org=(20, 100),
@@ -148,7 +168,7 @@ class ExcelProcessing:
                 # if true (value = 1), then we print label
                 if frame_data[k+1][i] == 1:
                     count2 += 1
-                    # prints text in green or red depedning on column label
+                    # prints text in green or red depending on column label
                     if k == 0 or k == 3 or k == 6:
                         c = (0,0,255)
                     else:
@@ -187,6 +207,9 @@ class ExcelProcessing:
 
 
     def get_per_frame_data(self):
+        # This method takes in the annotated excel data with frame ranges, and returns a data matrix of
+        # each frame number annotated, along with the annotation scheme of each label (0 vs. 1) at that frame
+         
         # initiates data lists
         frame_start = []
         frame_end = []
@@ -195,7 +218,7 @@ class ExcelProcessing:
         # name, mousid and date
         frame_data = [[] for _ in range(len(self.get_labels()) + 1)]
         # first column set to frame numbers between first and last frame
-        frame_data[0].extend(range(self.get_first_frame(), self.get_last_frame()))
+        frame_data[0].extend(range(self.get_first_frame(), self.get_last_frame()+1))
 
         # initiates all column labels to either 0 or 1
         for k in range(len(self.get_labels())):
@@ -225,6 +248,7 @@ class ExcelProcessing:
 
     def get_labels(self):
         # column labels of interest for data (ignoring name, mouse id, date)
+        # make sure to update if columns change
         labels = ["chattering", "trunk_present", "grooming", "trunk_absent", "running",
                   "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"]
         return labels
@@ -247,9 +271,12 @@ class ExcelProcessing:
     def get_bar_plot(self,label):
         # returns bar plot of frame number and occurrence (0 vs. 1) of a specified column label
         data = self.get_per_frame_data()
+        # get frame data
         frames = data[0]
+        # get column data
         label_data = data[self.get_labels().index(label)]
 
+        # create plot and axis
         fig1 = plt.figure()
         fig1.suptitle('Occurrence vs. Frame Number', fontsize=14, fontweight='bold')
         ax = fig1.add_subplot(111)
@@ -263,8 +290,10 @@ class ExcelProcessing:
         # returns cumulative sum plot of label occurrence vs. frame number
         data = self.get_per_frame_data()
         frames = data[0]
+        # get cumsum of column data
         label_data = np.cumsum(data[self.get_labels().index(label)])
 
+        # create plot axis and figure
         fig1 = plt.figure()
         fig1.suptitle('CumSum of Occurrence vs. Frame Number', fontsize=14, fontweight='bold')
         ax = fig1.add_subplot(111)
@@ -274,8 +303,28 @@ class ExcelProcessing:
 
         return fig1
 
-    def store_frame_data(self):
-        frame_pictures = []
+    def store_frame_data(self, label):
+        # stores frame data according to whether specified label has 0 or 1 on that frame
+        frame_pictures = [[] for _ in range(2)]
+        frame_data = self.get_per_frame_data()
+
+        # Iterate through every frame
+        for i in range(len(frame_data[0])):
+            # i +1 because first frame is at position 1, not 0 in OpenCV
+            # read frame at ith position
+            self.data_pointer.set(1,i+1)
+            ret, frame = self.data_pointer.read()
+            # if the label associated with the current frame is equal to zero, place in first colum of
+            # frame_data, otherwise if its equal to 1 place in second column of frame_data
+            # +1 because 0th column on frame_data is frame numbers, label column start at column 1
+            if frame_data[self.get_labels().index(label) + 1][i] == 0:
+                frame_pictures[0].append(frame)
+            elif frame_data[self.get_labels().index(label) +1][i] == 1:
+                frame_pictures[1].append(frame)
+            else:
+                continue
+
         return frame_pictures
+
 
 
