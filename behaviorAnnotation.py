@@ -39,12 +39,12 @@ class DataAnalysis:
 # initializes all DataAnalysis objects, takes video directory and lims ID
 DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos", "501021421")
 
-# data labels for annotation are: "ID", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
-# "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"
+# data labels for annotation are: "ID", "person", "mouseid", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
+# "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking", "timestamp"
 
-data = DataAnalysis.ep.get_cumulative_plot("tailrelaxed")
+data = DataAnalysis.ep.get_date()
 
-plt.show(data)
+print(data)
 
 
 
