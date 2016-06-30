@@ -42,14 +42,9 @@ DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_
 # data labels for annotation are: "ID", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
 # "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"
 
-data = DataAnalysis.sv.video_annotation()
+data = DataAnalysis.ep.get_cumulative_plot("tailrelaxed")
 
-
-
-
-
-
-
+plt.show(data)
 
 
 

@@ -115,6 +115,8 @@ class ExcelProcessing:
     def video_annotation_labels(self):
 
         # outputs a .mp4 video with frame number and labeled annotation text
+
+        # gets video file directory and name
         file_name = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos").get_file_string()
         data_pointer = cv2.VideoCapture(file_name)
         fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
@@ -220,23 +222,23 @@ class ExcelProcessing:
 
     def get_labels(self):
         # column labels
-        labels = ["chattering", "down", "grooming", "moving", "relaxed", "running", "startle", "tailrelaxed",
-                  "tailtense", "tense", "up", "walking"]
+        labels = ["ID", "person", "mouseid", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running",
+                  "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking", "timestamp"]
         return labels
 
     def get_name(self):
         # returns name of annotator
-        name = self.get_column("name").iget(0)
+        name = self.get_column("person").iget(0)
         return name
 
     def get_mouse_ID(self):
         # returns Mouse LIMS ID
-        name = self.get_column("name").iget(0)
+        name = self.get_column("mouseid").iget(0)
         return name
 
     def get_date(self):
         # returns date of annotation
-        date= self.get_column("name").iget(0)
+        date= self.get_column("timestamp").iget(0)
         return date
 
     def get_bar_plot(self,label):
@@ -268,4 +270,6 @@ class ExcelProcessing:
         ax.bar(frames, label_data)
 
         return fig1
+
+    def store_frame_data(self):
 
