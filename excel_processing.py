@@ -49,9 +49,10 @@ class ExcelProcessing:
         From_frames = self.get_from()
 
         # for the each iteration, check whether the "to" frame is equal to the "from" frame in the next row
+        # if not continuous, returns which rows are discontinuous
         for k in range(len(From_frames)-1):
             if To_frames[k] != From_frames[k+1]:
-                return "Frames are not continuous!"
+                return "Frames are not continuous between row number %r and %r of the data" % (k+1, k+2)
             else:
                 continue
         return "Frames are continuous!"
@@ -96,7 +97,7 @@ class ExcelProcessing:
         data = self.get_column(label)
         count = 0
         frames = [[], []]
-        # first column is all the From frames, second is all the To frames
+        # Note: first column is all the From frames, second is all the To frames
         for i in data:
             if i == 0:
                 frames[0].append(self.get_from()[count])
@@ -114,7 +115,7 @@ class ExcelProcessing:
         data = self.get_column(label)
         count = 0
         frames = [[], []]
-        # first column is all the From frames, second is all the To frames
+        # NOTE: first column is all the From frames, second is all the To frames
         for i in data:
             if i == 1:
                 frames[0].append(self.get_from()[count])
@@ -209,7 +210,7 @@ class ExcelProcessing:
     def get_per_frame_data(self):
         # This method takes in the annotated excel data with frame ranges, and returns a data matrix of
         # each frame number annotated, along with the annotation scheme of each label (0 vs. 1) at that frame
-         
+
         # initiates data lists
         frame_start = []
         frame_end = []
