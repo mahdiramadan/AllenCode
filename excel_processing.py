@@ -19,6 +19,9 @@ class ExcelProcessing:
                 self.file_string = os.path.join(exl_folder, file)
                 # uploads as a DataFrame type
                 self.data = pandas.read_excel(self.file_string)
+                # get video directory and name
+                file_name = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos").get_file_string()
+                self.data_pointer = cv2.VideoCapture(file_name)
 
             else:
                 continue
@@ -116,25 +119,23 @@ class ExcelProcessing:
 
         # outputs a .mp4 video with frame number and labeled annotation text
 
-        # gets video file directory and name
-        file_name = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos").get_file_string()
-        data_pointer = cv2.VideoCapture(file_name)
-        fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
-        nFrames = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-        frameWidth = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
-        frameHeight = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+        # gets video file information
+        fps = self.data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
+        nFrames = int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        frameWidth = int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+        frameHeight = int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.cv.CV_FOURCC(*'mp4v')
         # change 3rd parameter of out function for different playback speeds
         out = cv2.VideoWriter('output.mp4', fourcc, fps, (frameWidth, frameHeight))
-        ret, frame = data_pointer.read()
+        ret, frame = self.data_pointer.read()
 
         # gets the data table with frame number and 0 or 1 for each column label
         frame_data = self.get_per_frame_data()
         # iterates through each row
-        for i in range(self.get_first_frame(), self.get_last_frame()):
+        for i in range(self.get_first_frame(), self.get_last_frame()+1):
             # prints frame number
             cv2.putText(img=frame,
-                        text=str(int(data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))),
+                        text=str(int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))),
                         org=(20, 100),
                         fontFace=cv2.FONT_HERSHEY_DUPLEX,
                         fontScale=1,
@@ -155,7 +156,7 @@ class ExcelProcessing:
 
                     cv2.putText(img=frame,
                                 text=str(self.get_labels()[k]),
-                                org=(0+count2*100, 100),
+                                org=(0+count2*120, 100),
                                 fontFace=cv2.FONT_HERSHEY_DUPLEX,
                                 fontScale=0.5,
                                 color= c,
@@ -167,12 +168,12 @@ class ExcelProcessing:
             # write out the frame
             out.write(frame)
             # read next frame
-            ret, frame = data_pointer.read()
+            ret, frame = self.data_pointer.read()
 
         # if number of labeled frames is less than number of video frames, just print frame number
         while ret:
             cv2.putText(img=frame,
-                        text=str(int(data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))),
+                        text=str(int(self.data_pointer.get(cv2.cv.CV_CAP_PROP_POS_FRAMES))),
                         org=(20, 100),
                         fontFace=cv2.FONT_HERSHEY_DUPLEX,
                         fontScale=1,
@@ -181,7 +182,7 @@ class ExcelProcessing:
                         lineType=cv2.CV_AA)
             out.write(frame)
             # read next frame
-            ret, frame = data_pointer.read()
+            ret, frame = self.data_pointer.read()
 
 
 
@@ -190,7 +191,8 @@ class ExcelProcessing:
         frame_start = []
         frame_end = []
         labels = self.get_labels()
-        # initiates the labels x number of frames data list
+        # initiates the labels x number of frames data list, the minus 3 is to ignore the columns of
+        # name, mousid and date
         frame_data = [[] for _ in range(len(self.get_labels()) + 1)]
         # first column set to frame numbers between first and last frame
         frame_data[0].extend(range(self.get_first_frame(), self.get_last_frame()))
@@ -205,6 +207,7 @@ class ExcelProcessing:
             frame_end.insert(0, self.get_frame_end(p))
 
             # for each frame, puts a 0 or 1 for each column label
+            # if you have frames 0 to 10 == 1, 10 to 20 == 0, frame 10 == 1 due to how code is set-up
             for k in range(len(self.get_labels())):
                 frame_data[k + 1].extend([self.get_true_false(self.get_labels()[k], p)] * (frame_end[0] - frame_start[0]))
 
@@ -217,13 +220,13 @@ class ExcelProcessing:
 
     def get_last_frame(self):
         # last labeled frame
-        last = self.get_column("To").iget(-1) + 1
+        last = self.get_column("To").iget(-1)
         return last
 
     def get_labels(self):
-        # column labels
-        labels = ["ID", "person", "mouseid", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running",
-                  "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking", "timestamp"]
+        # column labels of interest for data (ignoring name, mouse id, date)
+        labels = ["chattering", "trunk_present", "grooming", "trunk_absent", "running",
+                  "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"]
         return labels
 
     def get_name(self):
@@ -272,4 +275,7 @@ class ExcelProcessing:
         return fig1
 
     def store_frame_data(self):
+        frame_pictures = []
+        return frame_pictures
+
 
