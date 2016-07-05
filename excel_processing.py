@@ -6,25 +6,27 @@ import os
 import pandas
 import sys
 from raw_behavior import RawBehavior as rb
+from synced_videos import SyncedVideos as sv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import tqdm
 
 class ExcelProcessing:
-    def __init__(self, exl_folder):
+    def __init__(self, exl_folder, lims_ID):
 
         for file in os.listdir(exl_folder):
             # looks for the excel file and makes the directory to it
             if file.endswith(".xlsx") and not file.startswith("~$"):
                 self.directory = exl_folder
                 self.file_string = os.path.join(exl_folder, file)
-
+                self.lims_ID = lims_ID
                 # excel uploads as a DataFrame type
                 # IMPORTANT: zero based excel indexing starts with first row of numbered DATA, not the column labels.
                 # This means row zero is the first row of actual Data, not the column labels
                 self.data = pandas.read_excel(self.file_string)
                 # get video directory and name
-                file_name = rb("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos").get_file_string()
+                file_name = rb(exl_folder,lims_ID).get_file_string()
                 # data pointer to the behavior video annotated
                 self.data_pointer = cv2.VideoCapture(file_name)
 
@@ -37,10 +39,6 @@ class ExcelProcessing:
     def data_valid(self):
         return self.data_available
 
-    def get_id(self):
-        ID = self.data['ID']
-        return ID
-
     def frames_continuous(self):
         # this method checks to see if the labeled frames are continuous. Make sure the labeled frame data is continuous
         # for the rest of the code to work!
@@ -52,7 +50,7 @@ class ExcelProcessing:
         # if not continuous, returns which rows are discontinuous
         for k in range(len(From_frames)-1):
             if To_frames[k] != From_frames[k+1]:
-                return "Frames are not continuous between row number %r and %r of the data" % (k+1, k+2)
+                return "Frames are not continuous between row number %r and %r of the data" % (k+2, k+3)
             else:
                 continue
         return "Frames are continuous!"
@@ -248,7 +246,7 @@ class ExcelProcessing:
         return last
 
     def get_labels(self):
-        # column labels of interest for data (ignoring name, mouse id, date)
+        # column labels of interest for data (ignoring name, lims id, date)
         # make sure to update if columns change
         labels = ["chattering", "trunk_present", "grooming", "trunk_absent", "running",
                   "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"]
@@ -287,13 +285,12 @@ class ExcelProcessing:
 
         return fig1
 
-    def get_cumulative_plot(self, label):
+    def get_cumulative_plot_frame(self, label):
         # returns cumulative sum plot of label occurrence vs. frame number
         data = self.get_per_frame_data()
         frames = data[0]
         # get cumsum of column data
-        label_data = np.cumsum(data[self.get_labels().index(label)])
-
+        label_data = np.cumsum(data[self.get_labels().index(label) + 1])
         # create plot axis and figure
         fig1 = plt.figure()
         fig1.suptitle('CumSum of Occurrence vs. Frame Number', fontsize=14, fontweight='bold')
@@ -304,10 +301,50 @@ class ExcelProcessing:
 
         return fig1
 
+    def get_frequency_plot(self, label):
+        # returns a plot of the change in frequency of a label per SECOND
+        data = self.get_per_frame_data()
+        fps = sv(self.directory, self.lims_ID).get_fps()
+        # get cumsum of column data
+        label_data = np.cumsum(data[self.get_labels().index(label) + 1])
+        # initiate counters and lists
+        frequency_data = []
+        time = []
+        count = 0
+        n = 0
+        # determines over how many frames we calculate annotation frequency
+        interval = 147
+
+        # iterate over each frame
+        for k in range(len(label_data)):
+            count += 1
+            # if count mod interval size = equal, then calculate the difference of the cumsum associated
+            # with this frame minus the cumsum at the frame one interval before
+            if count % interval == 0:
+                frequency_data.append(label_data[k]-label_data[k-(interval-1)])
+                n += 1
+                # round time in seconds to nearest integer
+                second = round(n*interval/fps)
+                time.append(second)
+            else:
+                continue
+
+        # create plot axis and figure
+
+        fig1 = plt.figure()
+        fig1.suptitle('Frequency of Occurrence, sampled every 5 seconds', fontsize=14, fontweight='bold')
+        ax = fig1.add_subplot(111)
+        ax.set_xlabel('Time (Sec)')
+        ax.set_ylabel('Frequency of Occurrence')
+        ax.bar(time, frequency_data)
+
+        return fig1
+
     def store_frame_data(self, label):
         # stores frame data according to whether specified label has 0 or 1 on that frame
         frame_pictures = [[] for _ in range(2)]
         frame_data = self.get_per_frame_data()
+
 
         # Iterate through every frame
         for i in range(len(frame_data[0])):
@@ -315,7 +352,7 @@ class ExcelProcessing:
             # read frame at ith position
             self.data_pointer.set(1,i+1)
             ret, frame = self.data_pointer.read()
-            # if the label associated with the current frame is equal to zero, place in first colum of
+            # if the label associated with the current frame is equal to zero, place in first column of
             # frame_data, otherwise if its equal to 1 place in second column of frame_data
             # +1 because 0th column on frame_data is frame numbers, label column start at column 1
             if frame_data[self.get_labels().index(label) + 1][i] == 0:
@@ -327,5 +364,15 @@ class ExcelProcessing:
 
         return frame_pictures
 
+    def is_from_smaller_than_to(self):
 
-
+        # makes sure the from frame is smaller than the to frame number in a row
+        To_frames = self.get_to()
+        From_frames = self.get_from()
+        # iterates through all rows and does check
+        for k in range(len(From_frames)):
+            if From_frames[k] == To_frames[k] or From_frames[k] > To_frames[k]:
+                return "Frames are timed incorrectly in row %r of the data" %(k+2)
+            else:
+                continue
+        return "All frames are timed correctly!"
