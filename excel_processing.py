@@ -330,12 +330,16 @@ class ExcelProcessing:
                 continue
 
         # create plot axis and figure
-
+        m = max(frequency_data)
         fig1 = plt.figure()
         fig1.suptitle('Frequency of Occurrence, sampled every 5 seconds', fontsize=14, fontweight='bold')
         ax = fig1.add_subplot(111)
         ax.set_xlabel('Time (Sec)')
         ax.set_ylabel('Frequency of Occurrence')
+        plt.ylim([0, (m+50)])
+
+        self.create_stimulus_definition_A(m, ax)
+
         ax.bar(time, frequency_data)
 
         return fig1
@@ -376,3 +380,40 @@ class ExcelProcessing:
             else:
                 continue
         return "All frames are timed correctly!"
+
+    def create_stimulus_definition_A(self, m, ax):
+
+        # create CAM stimulus definition visual for session A, with stimulus type labels
+        # m is is the maximum y value achieved by a plot
+        rectangle = plt.Rectangle((0, m + 20), 600, 10, fc='y')
+        rectangle2 = plt.Rectangle((600, m + 20), 30, 10, fc='0.75')
+        rectangle3 = plt.Rectangle((630, m + 20), 600, 10, fc='r')
+        rectangle4 = plt.Rectangle((1230, m + 20), 30, 10, fc='0.75')
+        rectangle5 = plt.Rectangle((1260, m + 20), 300, 10, fc='m')
+        rectangle6 = plt.Rectangle((1560, m + 20), 30, 10, fc='0.75')
+        rectangle7 = plt.Rectangle((1590, m + 20), 600, 10, fc='y')
+        rectangle8 = plt.Rectangle((2190, m + 20), 300, 10, fc='0.75')
+        rectangle9 = plt.Rectangle((2490, m + 20), 600, 10, fc='r')
+        rectangle10 = plt.Rectangle((3090, m + 20), 30, 10, fc='0.75')
+        rectangle11 = plt.Rectangle((3120, m + 20), 600, 10, fc='y')
+
+        plt.gca().add_patch(rectangle)
+        plt.gca().add_patch(rectangle2)
+        plt.gca().add_patch(rectangle3)
+        plt.gca().add_patch(rectangle4)
+        plt.gca().add_patch(rectangle5)
+        plt.gca().add_patch(rectangle6)
+        plt.gca().add_patch(rectangle7)
+        plt.gca().add_patch(rectangle8)
+        plt.gca().add_patch(rectangle9)
+        plt.gca().add_patch(rectangle10)
+        plt.gca().add_patch(rectangle11)
+
+        textsize = 6
+        ax.text(60, m+35, 'drifting grating', fontsize=textsize)
+        ax.text(630, m + 35, 'natural movie long', fontsize=textsize)
+        ax.text(1230, m + 35, 'natural movie 1', fontsize=textsize)
+        ax.text(1680, m + 35, 'drifting grating', fontsize=textsize)
+        ax.text(2190, m + 35, 'spontaneous', fontsize=textsize)
+        ax.text(2560, m + 35, 'natural movie long', fontsize=textsize)
+        ax.text(3160, m + 35, 'drifting grating', fontsize=textsize)
