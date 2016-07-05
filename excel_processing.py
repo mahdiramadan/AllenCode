@@ -313,7 +313,9 @@ class ExcelProcessing:
         count = 0
         n = 0
         # determines over how many frames we calculate annotation frequency
+        # 147 frames is approximately 5 seconds
         interval = 147
+        interval_seconds = round(147/fps)
 
         # iterate over each frame
         for k in range(len(label_data)):
@@ -330,9 +332,11 @@ class ExcelProcessing:
                 continue
 
         # create plot axis and figure
+
+        # gets maximum y value (frequency)
         m = max(frequency_data)
         fig1 = plt.figure()
-        fig1.suptitle('Frequency of Occurrence, sampled every 5 seconds', fontsize=14, fontweight='bold')
+        fig1.suptitle('Frequency of Occurrence, sampled every %r seconds' %(interval_seconds), fontsize=14, fontweight='bold')
         ax = fig1.add_subplot(111)
         ax.set_xlabel('Time (Sec)')
         ax.set_ylabel('Frequency of Occurrence')
@@ -409,6 +413,7 @@ class ExcelProcessing:
         plt.gca().add_patch(rectangle10)
         plt.gca().add_patch(rectangle11)
 
+        # set text size
         textsize = 6
         ax.text(60, m+35, 'drifting grating', fontsize=textsize)
         ax.text(630, m + 35, 'natural movie long', fontsize=textsize)
