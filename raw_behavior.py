@@ -12,13 +12,13 @@ import cv2
 from PIL import Image, ImageDraw
 
 class RawBehavior:
-    def __init__(self, exp_folder):
+    def __init__(self, exp_folder, lims_ID):
         self.count= 0
         self.file_string=''
         self.vidPath = exp_folder
 
         for file in os.listdir(exp_folder):
-            if file.endswith(".mp4"):
+            if file.endswith(".mp4") and file.startswith(lims_ID):
                 # We check if the file is accessible but we do not load it
                 self.file_string = os.path.join(exp_folder, file)
                 self.data_pointer = cv2.VideoCapture(self.file_string)
@@ -313,3 +313,4 @@ class RawBehavior:
 
     def get_file_string(self):
         return self.file_string
+

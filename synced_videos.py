@@ -18,7 +18,7 @@ from sync_meta import SyncMeta
 # import stimulus_behavior
 
 class SyncedVideos:
-    def __init__(self,exp_folder):
+    def __init__(self,exp_folder, lims_ID):
         
         # self.raw_physio_data_flow = raw_physio_data_flow
         # self.corr_physio_data_flow = corr_physio_data_flow
@@ -28,6 +28,7 @@ class SyncedVideos:
         self.sync_meta_flow = SyncMeta
         # self.stimulus_behavior = stimulus_behavior
         self.file = exp_folder
+        self.lims_ID = lims_ID
 
     def is_valid(self):
         return self.data_present
@@ -115,8 +116,7 @@ class SyncedVideos:
                 bottom_eye_tracking_range = self.eye_tracking_data_flow.get_quantile_movie(0)
                 
                 def scale_picture(tmp, top_clip, bottom_clip, red_saturation):
-    
-#                    xy_coords = np.where(tmp == red_saturation)
+                    # xy_coords = np.where(tmp == red_saturation)
                     tmp = np.clip(tmp, bottom_clip, top_clip)
                     tmp = (tmp.astype('float')-bottom_clip)/(top_clip-bottom_clip)
                     bottom_final = 0
@@ -226,7 +226,7 @@ class SyncedVideos:
         # outputs a .mp4 video, sped up x 2, with the frame count displayed in upper right.
         file_name = rb(self.file).get_file_string()
         data_pointer = cv2.VideoCapture(file_name)
-        fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
+        fps = self.get_fps()
         nFrames = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
         frameWidth = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         frameHeight = int(data_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
@@ -250,3 +250,10 @@ class SyncedVideos:
             out.write(frame)
             ret, frame = data_pointer.read()
 
+    def get_fps(self):
+        # returns fps of video in directory
+        file_name = rb(self.file, self.lims_ID).get_file_string()
+        data_pointer = cv2.VideoCapture(file_name)
+        fps = data_pointer.get(cv2.cv.CV_CAP_PROP_FPS)
+
+        return fps

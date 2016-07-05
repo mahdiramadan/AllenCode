@@ -21,13 +21,15 @@ class DataAnalysis:
     def __init__(self,exp_folder, lims_ID):
         #
                 # set up objects with parameters to be used
-                self.rb = rb(exp_folder)
+                # If class calls on another class that requires a lims_ID,
+                # class must have a lims_ID input (add input below)
+                self.rb = rb(exp_folder, lims_ID)
                 self.sb = sb(exp_folder)
-                self.sv = sv(exp_folder)
-                self.ep = ep(exp_folder)
+                self.sv = sv(exp_folder, lims_ID)
+                self.ep = ep(exp_folder,lims_ID)
                 # self.ld = ld(lims_ID)
 
-# Actual running script
+# Actual running script below
 
 # videos on this laptop stored in "/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos"
 # example LIMS ID is 501021421
@@ -37,14 +39,21 @@ class DataAnalysis:
 # LimsDatabase takes in LIMS ID
 
 # initializes all DataAnalysis objects, takes video directory and lims ID
-DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Videos", "501021421")
+DataAnalysis = DataAnalysis("/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Data/502021421", "501021421")
 
-# data labels for annotation are: "ID", "person", "mouseid", "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
-# "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking", "timestamp"
+# data labels for annotations are: "From", "To", "chattering", "trunk_present", "grooming", "trunk_absent", "running"
+# "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking", "person", "limsid", "timestamp"
 
-data = DataAnalysis.ep.get_date()
+data = DataAnalysis.ep.get_cumulative_plot_frame("startle")
 
-print(data)
+plt.show(data)
+
+
+
+
+
+
+
 
 
 

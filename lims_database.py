@@ -7,7 +7,7 @@ Created on Tue Oct 20 13:49:10 2015
 import pandas as pd
 import psycopg2
 import os
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import numpy as np
 # uncommented "import ophyse" due to path errors
 # import ophyse
