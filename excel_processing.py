@@ -37,7 +37,7 @@ class ExcelProcessing:
         self.behavior_data_flow = rb
 
     def data_valid(self):
-        return self.data_available
+        return self.data_present
 
     def frames_continuous(self):
         # this method checks to see if the labeled frames are continuous. Make sure the labeled frame data is continuous
@@ -158,7 +158,7 @@ class ExcelProcessing:
                         org=(20, 100),
                         fontFace=cv2.FONT_HERSHEY_DUPLEX,
                         fontScale=1,
-                        color=(0, 255, 0),
+                        color=(0, 0, 0),
                         thickness=2,
                         lineType=cv2.CV_AA)
             count2 = 0
@@ -167,20 +167,30 @@ class ExcelProcessing:
                 # if true (value = 1), then we print label
                 if frame_data[k+1][i] == 1:
                     count2 += 1
-                    # prints text in green or red depending on column label
-                    if k == 0 or k == 3 or k == 6:
-                        c = (0,0,255)
+                    # # prints text in green or red depending on column label (optional for color effects)
+                    # if k == 0 or k == 3 or k == 6:
+                    # color codes of format (x,y,z)
+                    #     c = (0,0,255)
+                    # else:
+                    #     c = (0,255,0)
+                    if count2 == 1:
+                        cv2.putText(img=frame,
+                                    text=str(self.get_labels()[k]),
+                                    org=(0 + count2 * 80, 100),
+                                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                                    fontScale=0.35,
+                                    color=(0, 0, 0),
+                                    thickness=1,
+                                    lineType=cv2.CV_AA)
                     else:
-                        c = (0,255,0)
-
-                    cv2.putText(img=frame,
-                                text=str(self.get_labels()[k]),
-                                org=(0+count2*120, 100),
-                                fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                                fontScale=0.5,
-                                color= c,
-                                thickness=1,
-                                lineType=cv2.CV_AA)
+                        cv2.putText(img=frame,
+                                    text=str(self.get_labels()[k]),
+                                    org=(0+count2*90, 100),
+                                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                                    fontScale=0.35,
+                                    color= (0,255,0),
+                                    thickness=1,
+                                    lineType=cv2.CV_AA)
                 else:
                     continue
 
