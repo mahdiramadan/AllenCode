@@ -10,7 +10,7 @@ from synced_videos import SyncedVideos as sv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import tqdm
+
 
 class ExcelProcessing:
     def __init__(self, exl_folder, lims_ID):
@@ -259,7 +259,7 @@ class ExcelProcessing:
         # column labels of interest for data (ignoring name, lims id, date)
         # make sure to update if columns change
         labels = ["chattering", "trunk_present", "grooming", "trunk_absent", "running",
-                  "startle", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"]
+                  "fidget", "tail_relaxed", "tail_tense", "flailing_present", "flailing_absent", "walking"]
         return labels
 
     def get_name(self):
