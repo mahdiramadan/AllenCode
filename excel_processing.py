@@ -10,6 +10,11 @@ from synced_videos import SyncedVideos as sv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import h5py
+from operator import itemgetter
+from itertools import groupby
+import matplotlib.patches as mpatches
+
 
 
 class ExcelProcessing:
@@ -277,7 +282,45 @@ class ExcelProcessing:
         date= self.get_column("timestamp").iget(0)
         return date
 
-    def get_bar_plot(self,label):
+
+    def store_frame_data(self, label):
+        # stores frame data according to whether specified label has 0 or 1 on that frame
+        frame_pictures = [[] for _ in range(2)]
+        frame_data = self.get_per_frame_data()
+
+
+        # Iterate through every frame
+        for i in range(len(frame_data[0])):
+            # i +1 because first frame is at position 1, not 0 in OpenCV
+            # read frame at ith position
+            self.data_pointer.set(1,i+1)
+            ret, frame = self.data_pointer.read()
+            # if the label associated with the current frame is equal to zero, place in first column of
+            # frame_data, otherwise if its equal to 1 place in second column of frame_data
+            # +1 because 0th column on frame_data is frame numbers, label column start at column 1
+            if frame_data[self.get_labels().index(label) + 1][i] == 0:
+                frame_pictures[0].append(frame)
+            elif frame_data[self.get_labels().index(label) +1][i] == 1:
+                frame_pictures[1].append(frame)
+            else:
+                continue
+
+        return frame_pictures
+
+    def is_from_smaller_than_to(self):
+
+        # makes sure the from frame is smaller than the to frame number in a row
+        To_frames = self.get_to()
+        From_frames = self.get_from()
+        # iterates through all rows and does check
+        for k in range(len(From_frames)):
+            if From_frames[k] == To_frames[k] or From_frames[k] > To_frames[k]:
+                return "Frames are timed incorrectly in row %r of the data" %(k+2)
+            else:
+                continue
+        return "All frames are timed correctly!"
+
+    def get_bar_plot(self, label):
         # returns bar plot of frame number and occurrence (0 vs. 1) of a specified column label
         data = self.get_per_frame_data()
         # get frame data
@@ -325,7 +368,7 @@ class ExcelProcessing:
         # determines over how many frames we calculate annotation frequency
         # 147 frames is approximately 5 seconds
         interval = 147
-        interval_seconds = round(147/fps)
+        interval_seconds = round(147 / fps)
 
         # iterate over each frame
         for k in range(len(label_data)):
@@ -333,10 +376,10 @@ class ExcelProcessing:
             # if count mod interval size = equal, then calculate the difference of the cumsum associated
             # with this frame minus the cumsum at the frame one interval before
             if count % interval == 0:
-                frequency_data.append(label_data[k]-label_data[k-(interval-1)])
+                frequency_data.append(label_data[k] - label_data[k - (interval - 1)])
                 n += 1
                 # round time in seconds to nearest integer
-                second = round(n*interval/fps)
+                second = round(n * interval / fps)
                 time.append(second)
             else:
                 continue
@@ -346,89 +389,98 @@ class ExcelProcessing:
         # gets maximum y value (frequency)
         m = max(frequency_data)
         fig1 = plt.figure()
-        fig1.suptitle('Frequency of Occurrence, sampled every %r seconds' %(interval_seconds), fontsize=14, fontweight='bold')
+        fig1.suptitle('Frequency of Occurrence, sampled every %r seconds' % (interval_seconds), fontsize=14,
+                      fontweight='bold')
         ax = fig1.add_subplot(111)
         ax.set_xlabel('Time (Sec)')
         ax.set_ylabel('Frequency of Occurrence')
-        plt.ylim([0, (m+50)])
+        plt.ylim([0, (m + 50)])
 
-        self.create_stimulus_definition_A(m, ax)
+        self.create_stimulus_definition(m, ax, fps)
 
         ax.bar(time, frequency_data)
 
         return fig1
 
-    def store_frame_data(self, label):
-        # stores frame data according to whether specified label has 0 or 1 on that frame
-        frame_pictures = [[] for _ in range(2)]
-        frame_data = self.get_per_frame_data()
+    def create_stimulus_definition(self, m, ax, fps):
+        # create CAM stimulus definition visual
+
+        # get nwb file data
+        nwb_file = self.open_nwb()
+
+        #types of possible stimuli
+        stimuli = ['spontaneous_stimulus','drifting_gratings_stimulus','natural_movie_one_stimulus', 'natural_movie_two_stimulus',
+                   'natural_movie_three_stimulus', 'static_gratings_stimulus',
+                   'locally_sparse_noise_stimulus']
+        # open data to presentation branch
+        visual = nwb_file['stimulus']['presentation']
+
+        # iterate over stimulus types, if type is found in data, then get frame durations
+        for stim in stimuli:
+            if stim in visual:
+
+                # get unique frame numbers
+                frames = np.unique([nwb_file['stimulus']['presentation'][stim]['frame_duration'][()]])
+
+                # to get continuous frame ranges, un-comment code right below
+                # ranges = []
+                # for k, g in groupby(enumerate(frames), lambda (i, x): i - x):
+                #     group = map(itemgetter(1), g)
+                #     ranges.append((group[0], group[-1]))
+
+                c = 0
+                # diff colors for each stim (black should be for stim that needs an edge color as explained below
+                colors = ('y','k','r','b','g','m','c')
+
+                # since some stimuli are on and off frequently (rect too thin), we might want rect edges so that the rect can show
+                # Because of edgecolor on
+                edgecolor = ('none','k','none','none','none','none','none')
 
 
-        # Iterate through every frame
-        for i in range(len(frame_data[0])):
-            # i +1 because first frame is at position 1, not 0 in OpenCV
-            # read frame at ith position
-            self.data_pointer.set(1,i+1)
-            ret, frame = self.data_pointer.read()
-            # if the label associated with the current frame is equal to zero, place in first column of
-            # frame_data, otherwise if its equal to 1 place in second column of frame_data
-            # +1 because 0th column on frame_data is frame numbers, label column start at column 1
-            if frame_data[self.get_labels().index(label) + 1][i] == 0:
-                frame_pictures[0].append(frame)
-            elif frame_data[self.get_labels().index(label) +1][i] == 1:
-                frame_pictures[1].append(frame)
+                for i in range(len(frames)-1):
+                    # If frame ranges is of length less than 150, then assume it is giving frame ranges. Otherwise,
+                    # assume it is giving individual frames ( range e.g. 0 - 10000,
+                    # individual e.g. 0, 1, 2, 3.... 10000)
+                    # shortest stimulus is 30 seconds, longest movie is 3800 seconds, 3800/30 is about 150
+                    # Thus, you wil never have more than 150 discrete frame ranges
+                    if len(frames) < 150:
+                        length = frames[i+1] - frames[i]
+                        x = frames[i] / fps
+                        rectangle = plt.Rectangle((x, m + 20), length/fps, 10, fc= colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)],linewidth = 0.5)
+                        plt.gca().add_patch(rectangle)
+
+                    else:
+                        x = frames[i] / fps
+                        rectangle = plt.Rectangle((x, m + 20), 1 / fps, 10, fc=colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)], linewidth = 0.5)
+                        plt.gca().add_patch(rectangle)
+
+            # if type if not in data, take next type
             else:
                 continue
 
-        return frame_pictures
 
-    def is_from_smaller_than_to(self):
 
-        # makes sure the from frame is smaller than the to frame number in a row
-        To_frames = self.get_to()
-        From_frames = self.get_from()
-        # iterates through all rows and does check
-        for k in range(len(From_frames)):
-            if From_frames[k] == To_frames[k] or From_frames[k] > To_frames[k]:
-                return "Frames are timed incorrectly in row %r of the data" %(k+2)
-            else:
-                continue
-        return "All frames are timed correctly!"
+    def open_nwb(self):
+        # opens nwb file
+        for file in os.listdir(self.directory):
+            if file.endswith("nwb"):
+                # make sure file is in there!
+                nwb_path = os.path.join(self.directory, file)
+                # input file path, r is for read only
+                nwb_file = h5py.File(nwb_path, "r")
+        if not file:
+            print ("nwb file not found.")
 
-    def create_stimulus_definition_A(self, m, ax):
+        return nwb_file
 
-        # create CAM stimulus definition visual for session A, with stimulus type labels
-        # m is is the maximum y value achieved by a plot
-        rectangle = plt.Rectangle((0, m + 20), 600, 10, fc='y')
-        rectangle2 = plt.Rectangle((600, m + 20), 30, 10, fc='0.75')
-        rectangle3 = plt.Rectangle((630, m + 20), 600, 10, fc='r')
-        rectangle4 = plt.Rectangle((1230, m + 20), 30, 10, fc='0.75')
-        rectangle5 = plt.Rectangle((1260, m + 20), 300, 10, fc='m')
-        rectangle6 = plt.Rectangle((1560, m + 20), 30, 10, fc='0.75')
-        rectangle7 = plt.Rectangle((1590, m + 20), 600, 10, fc='y')
-        rectangle8 = plt.Rectangle((2190, m + 20), 300, 10, fc='0.75')
-        rectangle9 = plt.Rectangle((2490, m + 20), 600, 10, fc='r')
-        rectangle10 = plt.Rectangle((3090, m + 20), 30, 10, fc='0.75')
-        rectangle11 = plt.Rectangle((3120, m + 20), 600, 10, fc='y')
 
-        plt.gca().add_patch(rectangle)
-        plt.gca().add_patch(rectangle2)
-        plt.gca().add_patch(rectangle3)
-        plt.gca().add_patch(rectangle4)
-        plt.gca().add_patch(rectangle5)
-        plt.gca().add_patch(rectangle6)
-        plt.gca().add_patch(rectangle7)
-        plt.gca().add_patch(rectangle8)
-        plt.gca().add_patch(rectangle9)
-        plt.gca().add_patch(rectangle10)
-        plt.gca().add_patch(rectangle11)
 
-        # set text size
-        textsize = 6
-        ax.text(60, m+35, 'drifting grating', fontsize=textsize)
-        ax.text(630, m + 35, 'natural movie long', fontsize=textsize)
-        ax.text(1230, m + 35, 'natural movie 1', fontsize=textsize)
-        ax.text(1680, m + 35, 'drifting grating', fontsize=textsize)
-        ax.text(2190, m + 35, 'spontaneous', fontsize=textsize)
-        ax.text(2560, m + 35, 'natural movie long', fontsize=textsize)
-        ax.text(3160, m + 35, 'drifting grating', fontsize=textsize)
+
+
+
+
+
+
+
+
+
