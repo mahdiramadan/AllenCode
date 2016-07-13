@@ -451,7 +451,7 @@ class ExcelProcessing:
 
                     else:
                         x = frames[i] / fps
-                        rectangle = plt.Rectangle((x, m + 20), 1 / fps, 10, fc=colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)], linewidth = 0.5)
+                        rectangle = plt.Rectangle((x, m + 20), 1 / fps, 10, fc=colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)], linewidth = 0.2)
                         plt.gca().add_patch(rectangle)
 
             # if type if not in data, take next type
