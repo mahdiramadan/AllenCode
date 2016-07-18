@@ -9,10 +9,12 @@ from synced_videos import SyncedVideos as sv
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import sys
+from scipy import ndimage
 import skimage
 from skimage.feature import greycomatrix, greycoprops
 from sklearn.neighbors import NearestNeighbors
-from sklearn.lda import LDA
+
 
 
 class ImageProcessing:
@@ -141,7 +143,7 @@ class ImageProcessing:
 
         return image
 
-    def select_foreground(self,frame):
+    def select_foreground(self,frame, width, height):
 
         # convert to grey scale
         img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -153,7 +155,7 @@ class ImageProcessing:
         img_contrast = self.image_contrast(gauss, 0.5, -100)
 
         # threshold
-        ret, img = cv2.threshold(img_contrast, 220, 255, cv2.THRESH_OTSU)
+        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_OTSU)
 
         # sharpen image
         img_sharp = self.sharpen_image(img, 8.0)
@@ -168,289 +170,167 @@ class ImageProcessing:
         # foreground
         dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
         ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
-        self.show_frame(sure_fg)
+
         # unknown region
         sure_fg = np.uint8(sure_fg)
         unknown = cv2.subtract(sure_bg, sure_fg)
 
-        # image processed without background (size is 480 x 640)
-        for i in range(0, 480):
-            if i in range(0, 140) or i in range(400, 480):
-                frame[i, :] = 255
-            else:
-                for j in range(0, 640):
-                    if sure_fg[i, j] != 0:
-                        frame[i, j] = 255
-
-        return frame
+        return sure_fg
 
 
     def image_segmentation(self):
 
         # get frame
-
+        self.video_pointer.set(1, 1000)
         ret, frame = self.video_pointer.read()
-        self.show_frame(frame)
-        self.show_frame(cv2.Canny(frame, 100,200))
 
+        height= len(frame)
+        width= len(frame[1])
 
         # select foreground
-        foreground = self.select_foreground(frame)
+        foreground = self.select_foreground(frame, width, height)
 
-        # # select mouse
-        mouse = self.select_mouse(foreground)
-
-
-    def select_mouse(self,fore):
-
-        # Ran 100,000 alpha, beta and sharpen values,
-        # largest glcm clustering distance was given with values
-        # alpha =2, beta = -50, sharpen = 3
-        img = fore
-
-        values = (4, 10, 2)
-        vectors = self.generate_glcm(values[0],values[1],values[2],fore)
+        # crop image
+        where = 140
+        crop = self. crop_image(frame, foreground, width, height, where)
 
 
-        xs = vectors['xs']
-        ys = vectors['ys']
-        length = vectors['length']
+        # select mouse
+        mouse = self.select_image_range(crop, width, height)
+
+        while mouse['range'] < 180:
+            try:
+                where = where - 10
+                crop = self.crop_image(frame, foreground, width, height, where)
+                mouse = self.select_image_range(crop, width, height)
+
+            except:
+                print ('mouse height position is unexpected')
+                sys.exit()
+
+        no_wheel = self.crop_wheel(mouse['image'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
+
+        center = self.find_mouse_center(mouse['image'])
+
+
+
+    def crop_image(self, frame, sure_fg, width, height, where):
+
+        # image processed without background (size is 480 x 640)
+        for i in range(0, height):
+            if i in range(0, where):
+                frame[i, :] = 255
+            else:
+                for j in range(0, width):
+                    if sure_fg[i, j] != 0:
+                        frame[i, j] = 255
+        return frame
+
+    def select_image_range(self, image, w, h):
+
+        image = cv2.Canny(image, 90, 190)
+
+
+        initial = image[0, w-1]
+        top = 0
+        for height in range(0, h):
+
+            if image[height, w-1] - initial > initial - initial/2:
+                top = height
+
+                break
+
+        bottom = 0
+
+        for up in range(h-1, 0, -1):
+            if image[up, w/2: w-1].max() - initial > initial - initial / 2:
+                bottom = up
+                break
+
+        new_image = image[top+10:bottom, 0:w]
+
+        height = len(new_image)
+        width = len(new_image[1])
+
         points = []
 
-        for i in range(len(xs)):
-            points.append((xs[i], ys[i]))
+        x = 0
+        y = height-1
+        while (x <= width):
+            if new_image[y, x:(x+63)].mean() - initial > initial - initial / 2:
+                points.append([x+63, y])
+                x = x + 63
+                y = height-1
 
-        # LDA classifier, with data and labels (0,1)
-        clf = LDA()
-        labels = np.concatenate((np.zeros(length), np.ones(length)), axis = 0)
-        clf.fit(points, labels)
-
-        # nbrs = NearestNeighbors(n_neighbors=2, algorithm='auto').fit(points)
-        patch = []
-        indices = []
-        patch_size = 10
-        fore = cv2.cvtColor(fore, cv2.COLOR_BGR2GRAY)
-
-        # get glcm values for all image patches
-        for i in range (0,480, patch_size):
-            for k in range (0, 640, patch_size):
-                patch.append(fore[i: (i + patch_size), k:(k + patch_size)])
-                indices.append([i,k])
-
-        new_vectors = self.glcm_all_patches(patch,values[0],values[1],values[2],fore)
-
-        xs = new_vectors['xs']
-        ys = new_vectors['ys']
-        new_points =[]
-        for i in range(len(patch)):
-            new_points.append((xs[i], ys[i]))
-
-        # predict new patches
-        prediction = clf.predict(new_points)
-        machine=[]
-        mouse=[]
-
-        # take out zero labeled patches
-        for i in range(len(prediction)):
-            if prediction[i] != 0:
-                machine.append(new_points[i])
-                img[indices[i][0]: indices[i][0] + patch_size, indices[i][1]: indices[i][1] + patch_size] = 255
             else:
-                mouse.append(new_points[i])
-        # self.plot_glcm_3(mouse, machine)
+                if y != 0:
+                    y = y-1
+                else:
+                    x= x + 63
+                    y = height-1
+
+        xs = []
+        ys= []
+
+        for point in points:
+            xs.append(point[0])
+            ys. append(point[1])
+            cv2.circle(new_image, (point[0], point[1]), 10, 255)
+
+        self.show_frame(new_image)
 
 
-        # distances, indices = nbrs.kneighbors(new_points)
-        # count = 0
-        # mouse= []
-        # machine =[]
-        # for element in distances:
-        #     if element[0] == 0 and element[1] == 0:
-        #         machine.append((xs[count],ys[count]))
-        #     else:
-        #         if element[0]< element[1]:
-        #             mouse.append((xs[count],ys[count]))
-        #         else:
-        #             pass
-        #     count += 1
-        #
-        # labeled_vector = [machine, mouse]
-        # self.plot_glcm_3(labeled_vector, len(machine))
-
-        # plt.show()
+        return {'image':new_image,'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height}
 
 
-
-
-
-
-    def generate_glcm(self, x, y, z, img):
-
-        # # size of image patches being classified
-        PATCH_SIZE = 10
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        # increase contrast
-        alpha = float(x)
-        beta = float(y)
-        # alpha controls gain (contrast)
-        self.array_alpha = np.array([alpha])
-        # beta controls bias (brightness)
-        self.array_beta = np.array([beta])
-
-        # add a beta value to every pixel
-        cv2.add(img, self.array_beta, img)
-
-        # multiply every pixel value by alpha
-        cv2.multiply(img, self.array_alpha, img)
-
-        kernel = np.zeros((9, 9), np.float32)
-        # Identity, times two!
-        kernel[4, 4] = z
-
-        # Create a box filter:
-        boxFilter = np.ones((9, 9), np.float32) / 81.0
-
-        # Subtract the two:
-        kernel = kernel - boxFilter
-
-        # Note that we are subject to overflow and underflow here...but I believe that
-        # filter2D clips top and bottom ranges on the output, plus you'd need a
-        # very bright or very dark pixel surrounded by the opposite type.
-        img = cv2.filter2D(img, -1, kernel)
-
-
-        # pick known head clamp patches
-        head_locations = [(150, 200), (150, 250), (150, 400), (150, 600), (150, 560), (150, 500), (160, 460),
-                          (170, 420)]
-        head_patches = []
-        # pick out image head clamp patches
-        for loc in head_locations:
-            head_patches.append(img[loc[0]:(loc[0] + PATCH_SIZE),
-                                loc[1]:(loc[1] + PATCH_SIZE)])
-            # To visualize areas, uncomment line below
-            # cv2.circle(image, (loc[1], loc[0]), 10, 255)
-
-        # pick known mouse pixel patches
-        mouse_locations = [(200, 200), (200, 300), (200, 400), (300, 400), (300, 500), (320, 550), (320, 480),
-                           (230, 200)]
-        mouse_patches = []
-        # pick out mouse image patches
-        for loc in mouse_locations:
-            mouse_patches.append(img[loc[0]:(loc[0] + PATCH_SIZE),
-                                 loc[1]:(loc[1] + PATCH_SIZE)])
-            # cv2.circle(image2, (loc[1], loc[0]), 10, 255)
+    def find_mouse_center(self, image):
 
         xs = []
         ys = []
 
-        # for head clamp and mouse patches, calculate the glcm dissimilarity and correlation
-        for patch in (head_patches + mouse_patches):
-            glcm = greycomatrix(patch, [5], [0], 256, symmetric=True, normed=True)
-            xs.append(greycoprops(glcm, 'dissimilarity')[0, 0])
-            ys.append(greycoprops(glcm, 'correlation')[0, 0])
+        height = len(image)
+        width = len(image[1])
 
-        # return dissimilarity and correlation vectors
-        return {'xs': xs, 'ys': ys, 'length':len(head_patches)}
+        for i in range(0, width):
+            for k in range(0, height):
+                if image[k, i] == 255:
+                    xs. append(i)
+                    ys.append(k)
 
-    def plot_glcm(self, vectors):
+        x_center = int(np.sum(xs)/float(len(xs)))
+        y_center = int(np.sum(ys)/float(len(ys)))
 
-        # plots glcm dissimilarity vs. correlation
-        xs = vectors['xs']
-        ys = vectors['ys']
-        length = vectors['length']
-        fig = plt.figure(1)
-        ax = fig.add_subplot(111)
-        xmin= np.min(xs)-1
-        xmax= np.max(xs)+1
-        ymin= np.min(ys)-1
-        ymax= np.max(ys)+1
-        ax.plot(xs[:length], ys[:length], 'ro')
-        ax.plot(xs[length:], ys[length:], 'yo')
-        ax.set_xlabel('GLCM Dissimilarity')
-        ax.set_ylabel('GLVM Correlation')
-        ax.set_xlim([xmin, xmax])
-        ax.set_ylim([ymin, ymax])
+        cv2.circle(image, (x_center, y_center), 10, 255)
+        self.show_frame(image)
 
-    def plot_glcm_2(self, vectors):
-
-        # plots glcm dissimilarity vs. correlation
-        xs = vectors['xs']
-        ys = vectors['ys']
-        length = vectors['length']
-        fig = plt.figure(1)
-        ax = fig.add_subplot(111)
-        xmin = np.min(xs) - 1
-        xmax = np.max(xs) + 1
-        ymin = np.min(ys) - 1
-        ymax = np.max(ys) + 1
-        ax.plot(xs[:length], ys[:length], 'bo')
-        ax.set_xlabel('GLCM Dissimilarity')
-        ax.set_ylabel('GLVM Correlation')
-        ax.set_xlim([xmin, xmax])
-        ax.set_ylim([ymin, ymax])
-
-    def plot_glcm_3(self, mouse, machine):
-
-        # plots glcm dissimilarity vs. correlation
+        # self.draw_ellipse(image, x_center, y_center)
 
 
-        fig = plt.figure(1)
-        ax = fig.add_subplot(111)
-        for loc in mouse:
-            ax.plot(loc[0],loc[1],'mo')
-        for loc in machine:
-            ax.plot(loc[0],loc[1], 'ko')
-        ax.set_xlabel('GLCM Dissimilarity')
-        ax.set_ylabel('GLVM Correlation')
+    def draw_ellipse(self, image, x_center, y_center):
+
+        center = (int(x_center), int(y_center))
+        axes = (400, 100)
+
+        cv2.ellipse(image, center, axes, 10, 0.0, 360.0, (255,255,255))
 
 
-    def glcm_all_patches(self, patches, x,y,z, img):
 
-        # # size of image patches being classified
-        PATCH_SIZE = 20
+    def crop_wheel(self, image, xpoints, ypoints, width, height):
+        A = np.vstack([xpoints, np.ones(len(xpoints))]).T
+        m, c = np.linalg.lstsq(A, ypoints)[0]
 
-        # increase contrast
-        alpha = float(x)
-        beta = float(y)
-        # alpha controls gain (contrast)
-        self.array_alpha = np.array([alpha])
-        # beta controls bias (brightness)
-        self.array_beta = np.array([beta])
+        c = c + 5
 
-        # add a beta value to every pixel
-        cv2.add(img, self.array_beta, img)
+        first_point = int(c - m*0)
+        last_point = np.absolute(int(m*xpoints[-1] + c))
 
-        # multiply every pixel value by alpha
-        cv2.multiply(img, self.array_alpha, img)
+        cv2.line(image, (0,first_point), (width,last_point), (255,255,255))
 
-        kernel = np.zeros((9, 9), np.float32)
-        # Identity, times two!
-        kernel[4, 4] = z
+        self.show_frame(image)
 
-        # Create a box filter:
-        boxFilter = np.ones((9, 9), np.float32) / 81.0
 
-        # Subtract the two:
-        kernel = kernel - boxFilter
 
-        # Note that we are subject to overflow and underflow here...but I believe that
-        # filter2D clips top and bottom ranges on the output, plus you'd need a
-        # very bright or very dark pixel surrounded by the opposite type.
 
-        img = cv2.filter2D(img, -1, kernel)
-
-        xs = []
-        ys = []
-
-        # for head clamp and mouse patches, calculate the glcm dissimilarity and correlation
-        for patch in (patches):
-            glcm = greycomatrix(patch, [5], [0], 256, symmetric=True, normed=True)
-            xs.append(greycoprops(glcm, 'dissimilarity')[0, 0])
-            ys.append(greycoprops(glcm, 'correlation')[0, 0])
-
-        # return dissimilarity and correlation vectors
-        return {'xs': xs, 'ys': ys, 'length':len(patches)}
 
 
 
