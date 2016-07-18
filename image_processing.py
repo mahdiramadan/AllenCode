@@ -181,11 +181,12 @@ class ImageProcessing:
 
     def image_segmentation(self):
 
-        # get frame
-        self.video_pointer.set(1, 45000)
+        # get frame at specified frame number
+        self.video_pointer.set(1, 40000)
         ret, frame = self.video_pointer.read()
         self.show_frame(frame)
 
+        # calculate frame dimensions
         height= len(frame)
         width= len(frame[1])
 
@@ -198,23 +199,28 @@ class ImageProcessing:
 
 
         # select mouse
-        mouse = self.select_image_range(crop, width, height)
+        mouse = self.select_image_range(crop, crop, width, height)
 
+        # if the cropped out image is too small (due to too much cropping), re-crop using a different
+        # where value. If nothing works, print error message
         while mouse['range'] < 180:
             try:
                 where = where - 10
                 crop = self.crop_image(frame, foreground, width, height, where)
-                mouse = self.select_image_range(crop, width, height)
+                mouse = self.select_image_range(crop, crop, width, height)
 
             except:
                 print ('mouse height position is unexpected')
                 sys.exit()
 
+        # find center of mouse
         center = self.find_mouse_center(mouse['image'])
 
-        no_wheel = self.crop_wheel(mouse['image'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
+        # crop out wheel
+        no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
 
-
+        # draw ellipse around mouse for selection
+        elipse_image = self.draw_ellipse(image, x_center, y_center)
 
 
 
@@ -223,6 +229,7 @@ class ImageProcessing:
         # image processed without background (size is 480 x 640), based
         # on output of threshold function in select_foreground
         for i in range(0, height):
+            # where determines how much top of image is removed
             if i in range(0, where):
                 frame[i, :] = 255
             else:
@@ -231,7 +238,7 @@ class ImageProcessing:
                         frame[i, j] = 255
         return frame
 
-    def select_image_range(self, image, w, h):
+    def select_image_range(self, frame, image, w, h):
 
         # edge detection algorithm
         image = cv2.Canny(image, 60, 100)
@@ -259,7 +266,8 @@ class ImageProcessing:
                 break
 
         # create new image based on new top and bottom
-        new_image = image[top+10:bottom, 0:w]
+        raw_image = frame[top+10:bottom, 0:w]
+        new_image = image[top + 10:bottom, 0:w]
 
         height = len(new_image)
         width = len(new_image[1])
@@ -298,7 +306,7 @@ class ImageProcessing:
         # self.show_frame(new_image)
 
 
-        return {'image':new_image,'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height}
+        return {'image':new_image,'rawimage': raw_image, 'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height}
 
 
     def find_mouse_center(self, image):
@@ -325,9 +333,6 @@ class ImageProcessing:
 
         self.show_frame(image)
 
-        # self.draw_ellipse(image, x_center, y_center)
-
-
     def draw_ellipse(self, image, x_center, y_center):
 
         center = (int(x_center), int(y_center))
@@ -337,7 +342,7 @@ class ImageProcessing:
 
 
 
-    def crop_wheel(self, image, xpoints, ypoints, width, height):
+    def crop_wheel(self, image, rawimage, xpoints, ypoints, width, height):
 
         # this method will crop the wheel out based on the edge detection algorithm
         # employed in select_image_range
@@ -377,7 +382,8 @@ class ImageProcessing:
                 # if the points are in the second half of the image, change slope of line to accommodate (probably
                 # is the tail)
                 elif xmax >= 320:
-                    m = 0.32
+                    # change slope to 0.3
+                    m = 0.30
                     break
         # add ten to intersect to allow for some room from edge
         c = c + 10
@@ -393,10 +399,12 @@ class ImageProcessing:
         for i in range (int(c), height-1):
             for k in range (0, width):
                 if i > m*k + c:
-                    image[i,k] = 255
+                    rawimage[i,k] = 255
 
+        self.show_frame(rawimage)
 
-        self.show_frame(image)
+        return rawimage
+
 
 
 
