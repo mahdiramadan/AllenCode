@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import sys
+import time
 from scipy import ndimage
 import skimage
 from skimage.feature import greycomatrix, greycoprops
@@ -181,8 +182,9 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame
-        self.video_pointer.set(1, 1000)
+        self.video_pointer.set(1, 45000)
         ret, frame = self.video_pointer.read()
+        self.show_frame(frame)
 
         height= len(frame)
         width= len(frame[1])
@@ -208,15 +210,18 @@ class ImageProcessing:
                 print ('mouse height position is unexpected')
                 sys.exit()
 
+        center = self.find_mouse_center(mouse['image'])
+
         no_wheel = self.crop_wheel(mouse['image'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
 
-        center = self.find_mouse_center(mouse['image'])
+
 
 
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
-        # image processed without background (size is 480 x 640)
+        # image processed without background (size is 480 x 640), based
+        # on output of threshold function in select_foreground
         for i in range(0, height):
             if i in range(0, where):
                 frame[i, :] = 255
@@ -228,11 +233,15 @@ class ImageProcessing:
 
     def select_image_range(self, image, w, h):
 
-        image = cv2.Canny(image, 90, 190)
+        # edge detection algorithm
+        image = cv2.Canny(image, 60, 100)
 
-
+        # initial frame to use as reference (should be dark)
         initial = image[0, w-1]
         top = 0
+        # starting from the top of the image, iterate down until
+        # pixel value changes over 50% from initial pixel.
+        # this pixel is now the new top of the image
         for height in range(0, h):
 
             if image[height, w-1] - initial > initial - initial/2:
@@ -242,11 +251,14 @@ class ImageProcessing:
 
         bottom = 0
 
+        # starting at the bottom, iterate up the image until pixel value changes
+        # over 50% from initial pixel. This is now the new bottom of image
         for up in range(h-1, 0, -1):
             if image[up, w/2: w-1].max() - initial > initial - initial / 2:
                 bottom = up
                 break
 
+        # create new image based on new top and bottom
         new_image = image[top+10:bottom, 0:w]
 
         height = len(new_image)
@@ -256,6 +268,11 @@ class ImageProcessing:
 
         x = 0
         y = height-1
+
+        # Wheel edge detection method. Starting at the bottom of the image for width values spaced 63 pixels apart,
+        # iterate up the image. When the mean pixel value of the 63 wide sweep is over 50% different than
+        # the initial frame, label point as part of edge
+
         while (x <= width):
             if new_image[y, x:(x+63)].mean() - initial > initial - initial / 2:
                 points.append([x+63, y])
@@ -272,35 +289,40 @@ class ImageProcessing:
         xs = []
         ys= []
 
+        # return x and y coordinates for points outlining wheel edge
         for point in points:
             xs.append(point[0])
             ys. append(point[1])
             cv2.circle(new_image, (point[0], point[1]), 10, 255)
 
-        self.show_frame(new_image)
+        # self.show_frame(new_image)
 
 
         return {'image':new_image,'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height}
 
 
     def find_mouse_center(self, image):
-
+        # this method will find a point on the mouse (close to center of mouse) based on the center of
+        # mass of image edges
         xs = []
         ys = []
 
         height = len(image)
         width = len(image[1])
 
+        # get points where edges exist (colored white)
         for i in range(0, width):
             for k in range(0, height):
                 if image[k, i] == 255:
                     xs. append(i)
                     ys.append(k)
 
+        # calculate center of gravity for x and y
         x_center = int(np.sum(xs)/float(len(xs)))
         y_center = int(np.sum(ys)/float(len(ys)))
 
         cv2.circle(image, (x_center, y_center), 10, 255)
+
         self.show_frame(image)
 
         # self.draw_ellipse(image, x_center, y_center)
@@ -316,17 +338,69 @@ class ImageProcessing:
 
 
     def crop_wheel(self, image, xpoints, ypoints, width, height):
-        A = np.vstack([xpoints, np.ones(len(xpoints))]).T
-        m, c = np.linalg.lstsq(A, ypoints)[0]
 
-        c = c + 5
+        # this method will crop the wheel out based on the edge detection algorithm
+        # employed in select_image_range
 
-        first_point = int(c - m*0)
+        # initialize residual value
+        residual = width*height
+
+        # while the residual value is over a threshold, change which points are used to construct wheel edge
+        while residual > 2000:
+            # format x points into matrix
+            A = np.vstack([xpoints, np.ones(len(xpoints))]).T
+            # calculate a least square fit line to x and y points on wheel edge
+            m, c = np.linalg.lstsq(A, ypoints)[0]
+            # return distance residual of points
+            residual = np.linalg.lstsq(A, ypoints)[1]
+            print(residual)
+            # if there is too much residual (due to tail bent onto wheel or noise on wheel), find which
+            # points are most responsible for the residual
+            if residual > 2000:
+                distance = 0
+                max = 0
+                xmax = 0
+                ymax = 0
+                index = 0
+                for i in range(len(xpoints)):
+                    distance = np.absolute(m*xpoints[i] + c - (ypoints[i]))
+                    if distance > max:
+                        max = distance
+                        xmax = xpoints[i]
+                        ymax = ypoints[i]
+                        index = i
+                # if the points responsible for the residual are in the first half of the image (left to right),
+                # delete these points (most likely not the tail)
+                if xmax < 320:
+                    del xpoints[index]
+                    del ypoints[index]
+                # if the points are in the second half of the image, change slope of line to accommodate (probably
+                # is the tail)
+                elif xmax >= 320:
+                    m = 0.32
+                    break
+        # add ten to intersect to allow for some room from edge
+        c = c + 10
+
+        # visualize line constructed
+        first_point = int(m*xpoints[0] + c)
         last_point = np.absolute(int(m*xpoints[-1] + c))
-
         cv2.line(image, (0,first_point), (width,last_point), (255,255,255))
+        # self.show_frame(image)
+
+        # crop out wheel by checking if pixels are below or above line constructed
+        # at edge of wheel
+        for i in range (int(c), height-1):
+            for k in range (0, width):
+                if i > m*k + c:
+                    image[i,k] = 255
+
 
         self.show_frame(image)
+
+
+
+
 
 
 
