@@ -179,7 +179,7 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 66000)
+        self.video_pointer.set(1, 62000)
         ret, frame = self.video_pointer.read()
 
 
@@ -215,6 +215,8 @@ class ImageProcessing:
 
         # crop out wheel
         no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
+
+        tail = detect_tail(frame)
 
         # fill mouse up from reference point generate by find_mouse_center
         mouse_image = self.fill_mouse(mouse['image'], no_wheel, center['x_center'], center['y_center'], mouse['initial'])
@@ -298,7 +300,7 @@ class ImageProcessing:
         for point in points:
             xs.append(point[0])
             ys. append(point[1])
-            cv2.circle(new_image, (point[0], point[1]), 10, 255)
+            # cv2.circle(new_image, (point[0], point[1]), 10, 255)
 
         # self.show_frame(new_image)
 
@@ -326,13 +328,21 @@ class ImageProcessing:
         x_center = int(np.sum(xs)/float(len(xs)))
         y_center = int(np.sum(ys)/float(len(ys)))
 
-        # cv2.circle(image, (x_center, y_center), 10, 255)
+        cv2.circle(image, (x_center, y_center), 10, 255)
+        self.show_frame(image)
 
 
 
         return {'x_center': x_center, 'y_center': y_center}
 
     def fill_mouse(self, image, raw_image, x_center, y_center, initial):
+
+        if
+
+
+
+
+
 
         xl= x_center
         xr = x_center
@@ -383,24 +393,34 @@ class ImageProcessing:
         self.show_frame(image)
 
         x = xs[0] - interval
+        y = ys[0]
 
-        while not image[ys[0], x].mean() - initial > initial / 2:
+        while not image[y, x].max() - initial > initial / 2:
             x = x -1
 
-        cv2.circle(image, (x, ys[0]), 10, 255)
+        y_init= y
+        count = 0
+        while y-y_init < 20:
+            count += 1
+            while image[y, x].mean() - initial > initial / 2:
+                y = y + 1
 
-        coeffs = np.polyfit(xs, np.array(ys) - 2, 6)
+            while not image[y, x].max() - initial > initial / 2:
+                y= y + 1
 
-        height = len(image)
-        width = len(image[1])
-        for h in range(0, height):
-            for w in range(0, width):
-                if func(w,coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5], coeffs[6]) > h and w >= xs[4]:
-                        raw_image[h,w] = 255
+            if count > 100:
+                print ('Could not find mouth')
+                break
 
+        print(x,y)
 
-        self.show_frame(raw_image)
+        # cv2.circle(image, (x, y), 10, 255)
+        self.show_frame(image)
 
+    def detect_tail(self, frame):
+
+        self.show_frame(frame)
+        
 
 
     def crop_wheel(self, image, rawimage, xpoints, ypoints, width, height):
