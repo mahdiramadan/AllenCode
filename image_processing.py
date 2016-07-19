@@ -11,10 +11,7 @@ import matplotlib.pyplot as plt
 import cv2
 import sys
 import time
-from scipy import ndimage
-import skimage
-from skimage.feature import greycomatrix, greycoprops
-from sklearn.neighbors import NearestNeighbors
+import scipy.optimize as optimization
 
 
 
@@ -182,9 +179,9 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 40000)
+        self.video_pointer.set(1, 66000)
         ret, frame = self.video_pointer.read()
-        self.show_frame(frame)
+
 
         # calculate frame dimensions
         height= len(frame)
@@ -219,8 +216,8 @@ class ImageProcessing:
         # crop out wheel
         no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
 
-        # draw ellipse around mouse for selection
-        elipse_image = self.draw_ellipse(image, x_center, y_center)
+        # fill mouse up from reference point generate by find_mouse_center
+        mouse_image = self.fill_mouse(mouse['image'], no_wheel, center['x_center'], center['y_center'], mouse['initial'])
 
 
 
@@ -306,7 +303,7 @@ class ImageProcessing:
         # self.show_frame(new_image)
 
 
-        return {'image':new_image,'rawimage': raw_image, 'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height}
+        return {'image':new_image,'rawimage': raw_image, 'range':bottom-top, 'xpoints': xs, 'ypoints':ys, 'width': width, 'height': height, 'initial': initial}
 
 
     def find_mouse_center(self, image):
@@ -329,16 +326,80 @@ class ImageProcessing:
         x_center = int(np.sum(xs)/float(len(xs)))
         y_center = int(np.sum(ys)/float(len(ys)))
 
-        cv2.circle(image, (x_center, y_center), 10, 255)
+        # cv2.circle(image, (x_center, y_center), 10, 255)
 
+
+
+        return {'x_center': x_center, 'y_center': y_center}
+
+    def fill_mouse(self, image, raw_image, x_center, y_center, initial):
+
+        xl= x_center
+        xr = x_center
+        y = np.array(range(y_center-5, y_center+5))
+        count = 0
+        mod = 4
+        l = 0
+        while xr - xl < 250 and l < 10:
+            l += 1
+            while not image[y, xr].mean() - initial > initial / 2:
+                xr= xr+ 1
+                count += 1
+                if count%mod == 0:
+                    y = y + 1
+
+            y2 = np.array(range(y_center - 5, y_center + 5))
+            while not image[y2, xl].mean() - initial > initial / 2:
+                xl = xl- 1
+                count += 1
+
+            if xr-xl < 200:
+                mod = mod + 2
+            if xr-xl > 400:
+                print ('did not find mouse back edge')
+                break
+
+        # cv2.circle(image, (xl, y2[0]), 10, 255)
+        # cv2.circle(image, (xr, y[0]), 10, 255)
+
+        y = y_center
+        xs= []
+        ys= []
+        count = 0
+        interval = 20
+        for x in range(xl,xr, interval):
+            while not image[y, x+1:x+interval].mean() - initial > initial / 2 and count < y_center:
+                count += 1
+                y = y - 1
+
+            count = 0
+            xs.append(x+interval)
+            ys.append(y)
+            y_center  = y_center + (interval/mod)/2
+            y = y_center
+
+        for item in range(len(xs)):
+            cv2.circle(image, (xs[item], ys[item]), 10, 255)
         self.show_frame(image)
 
-    def draw_ellipse(self, image, x_center, y_center):
+        x = xs[0] - interval
 
-        center = (int(x_center), int(y_center))
-        axes = (400, 100)
+        while not image[ys[0], x].mean() - initial > initial / 2:
+            x = x -1
 
-        cv2.ellipse(image, center, axes, 10, 0.0, 360.0, (255,255,255))
+        cv2.circle(image, (x, ys[0]), 10, 255)
+
+        coeffs = np.polyfit(xs, np.array(ys) - 2, 6)
+
+        height = len(image)
+        width = len(image[1])
+        for h in range(0, height):
+            for w in range(0, width):
+                if func(w,coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5], coeffs[6]) > h and w >= xs[4]:
+                        raw_image[h,w] = 255
+
+
+        self.show_frame(raw_image)
 
 
 
@@ -358,7 +419,7 @@ class ImageProcessing:
             m, c = np.linalg.lstsq(A, ypoints)[0]
             # return distance residual of points
             residual = np.linalg.lstsq(A, ypoints)[1]
-            print(residual)
+
             # if there is too much residual (due to tail bent onto wheel or noise on wheel), find which
             # points are most responsible for the residual
             if residual > 2000:
@@ -402,12 +463,11 @@ class ImageProcessing:
                     rawimage[i,k] = 255
 
         self.show_frame(rawimage)
-
         return rawimage
 
 
-
-
+def func(x, a, b, c, d, e,f,g):
+    return a*x*x*x*x*x*x + b*x*x*x*x*x + c*x*x*x*x + d*x*x*x + e*x*x + f*x + g
 
 
 
