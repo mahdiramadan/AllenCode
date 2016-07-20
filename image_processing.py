@@ -181,11 +181,12 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 500)
+        self.video_pointer.set(1, 77040)
         ret, frame = self.video_pointer.read()
 
         # tail = self.detect_tail(frame)
 
+        t1 = time.time()
         # calculate frame dimensions
         height= len(frame)
         width= len(frame[1])
@@ -214,7 +215,7 @@ class ImageProcessing:
                 sys.exit()
 
         # find center of mouse
-        center = self.find_mouse_center(mouse['image'])
+        # center = self.find_mouse_center(mouse['image'])
 
         # crop out wheel
         no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
@@ -222,7 +223,9 @@ class ImageProcessing:
         # fill mouse up from reference point generate by find_mouse_center
         mouse_image = self.fill_mouse(mouse['image'], mouse['rawimage'], no_wheel['height'], mouse['initial'], no_wheel['m'], no_wheel['c'])
 
+        t2 = time.time()
 
+        print(t2-t1)
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
@@ -338,43 +341,41 @@ class ImageProcessing:
 
     def fill_mouse(self, image, raw_image, y_center, initial, m , c):
 
+        # load tail patch data
         tail = pickle.load(open('tail.pickle', 'rb'))
+
+        # get image dimensions
         height = len(raw_image)
         width = len(raw_image[1])
 
-        xc = width/2
+        # starting at y = 0 and x = halfway, go left until you find head clamp edge
+        xc = width / 2
         y = 0
         count = 0
+        # when contrast is over 50% of initial pixel, label as edge
         while not image[y, xc].mean() - initial > initial / 2:
-            xc= xc -1
+            xc = xc - 1
             count += 1
 
             if count > 320:
                 print ('could not find head clamp edge')
                 break
 
-        cv2.circle(image, (xc, int((m*xc +c)/2)), 10, 255)
-        self.show_frame(image)
-
-        xs = []
-        ys = []
-        for i in range(0, height - height % 10, 10):
-            for k in range(0, width, 10):
-                if ((raw_image[i: i + 10, k: k + 10] - tail[0:]).min() == 0 and image[i: i + 10,
-                                                                                 k: k + 10].mean() > 50):
-                    xs.append(k)
-                    ys.append(i)
-                    # cv2.circle(image, (k, i), 10, 255)
-
+        # draw a point between wheel and head clamp, this must be in head of mouse
+        cv2.circle(image, (xc, int((m * xc + c) / 2)), 10, 255)
         # self.show_frame(image)
 
 
-        xl = width/2
-        xr = width/2
-        y = np.array(range(y_center/2 -5, y_center/2 +5))
+        # starting at halfway point, find left and right edges of mouse
+        xl = width / 2
+        xr = width / 2
+        y = np.array(range(y_center / 2 - 5, y_center / 2 + 5))
         count = 0
         mod = 3
         l = 0
+
+        # while point does not meet gradient change of 50% from initial, keep going
+        # left or right
         while xr - xl < 250 and l < 10:
             l += 1
             while not image[y, xr].mean() - initial > initial / 2:
@@ -383,129 +384,104 @@ class ImageProcessing:
                 if count % mod == 0:
                     y = y + 1
 
-            y2 = np.array(range(y_center/2 -5, y_center/2 +5))
+            # y sweep is 10 pixels wide
+            y2 = np.array(range(y_center / 2 - 5, y_center / 2 + 5))
 
             if xl - xc > 50:
-                xl = xl- 5
-                while not image[y2, xl].mean() - initial > initial / 2 :
+                xl = xl - 5
+                while not image[y2, xl].mean() - initial > initial / 2:
                     xl = xl - 1
                     count += 1
-                if count > width/2:
+                if count > width / 2:
                     print ('could not find left edge of mouse')
                     break
-
 
             if xr - xl < 200:
                 mod = mod + 2
             if xr - xl > 450:
                 print ('did not find mouse back edge')
                 break
-
+        right_y = y[0]
         cv2.circle(image, (xl, y_center/2), 10, 255)
-        # cv2.circle(image, (xr, y[0]), 10, 255)
-        # self.show_frame(image)
+        cv2.circle(image, (xr, y[0]), 10, 255)
 
-
-
-        # self.show_frame(image)
-
-        h = y_center/2
+        # from left to right eges of mouse, find upper edges of mouse by iterating up
+        # at intervals of 20 in the x direction until gradient change value is met
+        h = y_center / 2
         y = h
-        xs = []
-        ys = []
+        xsu = []
+        ysu = []
         count = 0
         interval = 20
-        for x in range(xl, xr - xr%interval, interval):
-            while not image[y, x + 1:x + interval].mean() - initial > initial / 2 and count < y_center/2:
+        for x in range(xl, xr - xr % interval, interval):
+            while not image[y, x + 1:x + interval].mean() - initial > initial / 2 and count < y_center / 2:
                 count += 1
                 y = y - 1
 
             count = 0
-            xs.append(x + interval)
-            ys.append(y)
-            h= h + (interval / mod) / 2
+            xsu.append(x + interval)
+            ysu.append(y)
+            h = h + (interval / mod) / 2
             y = h
-
 
         maxy = height
         i = 0
-        first = 0
-        for item in range(len(xs)):
-            cv2.circle(image, (xs[item], ys[item]), 10, 255)
-            if ys[item] < 20:
-                pass
+        delete = []
+        # for each upper bound, get point and calculate highest point
+        for item in range(len(xsu)):
+            # cv2.circle(image, (xsu[item], ysu[item]), 10, 255)
+            if ysu[item] < 20:
+                delete.append(item)
+                continue
 
             else:
-                first = item
-
-                if ys[item] < maxy:
-                    maxy = ys[item]
+                if ysu[item] < maxy:
+                    maxy = ysu[item]
                     i = item
 
-        cv2.circle(image, (maxy, xs[i]), 10, 255)
-        self.show_frame(image)
+        for cancel in range(len(delete)):
+            del xsu[cancel]
+            del ysu[cancel]
 
-        print (maxy, xl)
+        for item in range(len(xsu)):
+            cv2.circle(image, (xsu[item], ysu[item]), 10, 255)
 
-        if xc > width /2 or xc < width/4:
-            raw_image = raw_image[maxy - 10: height, width/4: width]
+        # highest point of upper edge of mouse will be used as a measure to crop head clamp
+        # wheel edge calculated at the top of the code will be used to crop in front of mouse
+        if xc > width / 2:
+            raw_image = raw_image[maxy - 10: height, width /6 : width]
+            image = image[maxy - 10: height, width / 6: width]
+            xc = width/6
         else:
-            raw_image = raw_image[maxy - 10 : height, xc - 25: width]
+            raw_image = raw_image[maxy - 10: height, xc - 25: width]
+            image = image[maxy - 10: height, xc - 25: width]
 
-        self.show_frame(raw_image)
+        # get image dimensions
+        height = len(raw_image)
+        width = len(raw_image[1])
 
-        # self.find_mouth(xc, ys[item], image, initial)
+        # for patches of size 10 of latest cropped image, if patch is similar enough to any tail patch examples
+        # and is above threshold for amount of edge in patch, label point (should be on mouse)
+        xs = []
+        ys = []
+        for i in range(0, height - height % 10, 10):
+            for k in range(0, width - width%10, 10):
+                if ((raw_image[i: i + 10, k: k + 10] - tail[0:]).min() == 0 and image[i: i + 10,
+                                                                                k: k + 10].mean() > 50):
+                    cv2.circle(image, (k, i), 10, 255)
+                    xs.append(k)
+                    ys.append(i)
 
-        # if xr - xl < 150:
-        #     tail = pickle.load(open('tail.pickle', 'rb'))
-        #     height = len(raw_image)
-        #     width = len(raw_image[1])
-        #
-        #     xs = []
-        #     ys =[]
-        #     for i in range(0, height - height % 10, 10):
-        #         for k in range(0, width, 10):
-        #             if ((raw_image[i: i + 10, k: k + 10] - tail[0:]).min()) == 0 and image[i: i + 10,
-        #                                                                              k: k + 10].mean() > 50:
-        #                 # cv2.circle(raw_image, (k, i), 10, 0)
-        #                 xs.append(k)
-        #                 ys.append(i)
-        #
-        #     self.find_mouth(x_center - 100, y - 20, image, initial)
+        # self.show_frame(image)
+        # self.show_frame(raw_image)
 
-
-
-    def find_mouth(self, x,y, image, initial):
-
-        while image[y, x].mean() - initial > initial / 2:
-            x= x-1
-
-        while not image[y, x].max() - initial > initial / 2:
-            x = x - 1
-
-        y_init = y
-        count = 0
-        while y - y_init < 20:
-            count += 1
-            while image[y, x].mean() - initial > initial / 2:
-                y = y + 1
-
-            while not image[y, x].max() - initial > initial / 2:
-                y = y + 1
-
-            if count > 100:
-                print ('Could not find mouth')
-                break
-        cv2.circle(image, (x, y), 10, 0)
-        self.show_frame(image)
-
-        return {'x':x, 'y':y}
-
+        return {'raw_image': raw_image, 'edge image': image, 'head':(xc, int((m * xc + c) / 2)), 'mouse_left': (xl,y_center/2), 'mouse_right': (xr,right_y), 'mouse_back': (xsu,ysu), 'tail_feet': (xs,ys)}
 
 
     def detect_tail(self, frame):
 
         # self.show_frame(frame)
+        # performed on frame 62000 on LIMS ID 500860585
 
         PATCH_SIZE = 10
 
