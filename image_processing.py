@@ -181,9 +181,10 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 77040)
+        self.video_pointer.set(1, 92060)
         ret, frame = self.video_pointer.read()
 
+        self.show_frame(frame)
         # tail = self.detect_tail(frame)
 
         t1 = time.time()
@@ -213,7 +214,7 @@ class ImageProcessing:
             except:
                 print ('mouse height position is unexpected')
                 sys.exit()
-
+        self.show_frame(mouse['rawimage'])
         # find center of mouse
         # center = self.find_mouse_center(mouse['image'])
 
@@ -262,11 +263,15 @@ class ImageProcessing:
         bottom = 0
 
         # starting at the bottom, iterate up the image until pixel value changes
-        # over 50% from initial pixel. This is now the new bottom of image
+        # over 50% from initial pixel. This is now the new bottom of image.
+        # if bottom is too big (noise on wheel), keep going!
         for up in range(h-1, 0, -1):
             if image[up, w/2: w-1].max() - initial > initial - initial / 2:
                 bottom = up
-                break
+                if bottom > h*0.8:
+                    continue
+                else:
+                    break
 
         # create new image based on new top and bottom
         raw_image = frame[top+10:bottom, 0:w]
@@ -378,7 +383,7 @@ class ImageProcessing:
         # left or right
         while xr - xl < 250 and l < 10:
             l += 1
-            while not image[y, xr].mean() - initial > initial / 2:
+            while not image[y, xr].mean() - initial > initial / 2 and xr < width-1:
                 xr = xr + 1
                 count += 1
                 if count % mod == 0:
@@ -389,7 +394,7 @@ class ImageProcessing:
 
             if xl - xc > 50:
                 xl = xl - 5
-                while not image[y2, xl].mean() - initial > initial / 2:
+                while not image[y2, xl].mean() - initial > initial / 2 and xl > 1:
                     xl = xl - 1
                     count += 1
                 if count > width / 2:
@@ -472,8 +477,8 @@ class ImageProcessing:
                     xs.append(k)
                     ys.append(i)
 
-        # self.show_frame(image)
-        # self.show_frame(raw_image)
+        self.show_frame(image)
+        self.show_frame(raw_image)
 
         return {'raw_image': raw_image, 'edge image': image, 'head':(xc, int((m * xc + c) / 2)), 'mouse_left': (xl,y_center/2), 'mouse_right': (xr,right_y), 'mouse_back': (xsu,ysu), 'tail_feet': (xs,ys)}
 
@@ -545,8 +550,10 @@ class ImageProcessing:
                     # change slope to 0.3
                     m = 0.30
                     break
+
         # add ten to intersect to allow for some room from edge
         c = c + 10
+
 
         # visualize line constructed
         first_point = int(m*xpoints[0] + c)
@@ -561,7 +568,7 @@ class ImageProcessing:
                 if i > m*k + c:
                     rawimage[i,k] = 255
 
-        # self.show_frame(rawimage)
+        self.show_frame(rawimage)
         return {'image':rawimage, 'height': int(m*width/2 + (c-10)), 'm': m, 'c':c -10}
 
 
