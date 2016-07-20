@@ -10,7 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import sys
+import pickle
 import time
+from sklearn.decomposition import PCA
 import scipy.optimize as optimization
 
 
@@ -179,9 +181,10 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 62000)
+        self.video_pointer.set(1, 500)
         ret, frame = self.video_pointer.read()
 
+        # tail = self.detect_tail(frame)
 
         # calculate frame dimensions
         height= len(frame)
@@ -216,10 +219,8 @@ class ImageProcessing:
         # crop out wheel
         no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
 
-        tail = detect_tail(frame)
-
         # fill mouse up from reference point generate by find_mouse_center
-        mouse_image = self.fill_mouse(mouse['image'], no_wheel, center['x_center'], center['y_center'], mouse['initial'])
+        mouse_image = self.fill_mouse(mouse['image'], mouse['rawimage'], no_wheel['height'], mouse['initial'], no_wheel['m'], no_wheel['c'])
 
 
 
@@ -328,99 +329,201 @@ class ImageProcessing:
         x_center = int(np.sum(xs)/float(len(xs)))
         y_center = int(np.sum(ys)/float(len(ys)))
 
-        cv2.circle(image, (x_center, y_center), 10, 255)
-        self.show_frame(image)
+        # cv2.circle(image, (x_center, y_center), 10, 255)
+        # self.show_frame(image)
 
 
 
         return {'x_center': x_center, 'y_center': y_center}
 
-    def fill_mouse(self, image, raw_image, x_center, y_center, initial):
+    def fill_mouse(self, image, raw_image, y_center, initial, m , c):
 
-        if
+        tail = pickle.load(open('tail.pickle', 'rb'))
+        height = len(raw_image)
+        width = len(raw_image[1])
 
-
-
-
-
-
-        xl= x_center
-        xr = x_center
-        y = np.array(range(y_center-5, y_center+5))
+        xc = width/2
+        y = 0
         count = 0
-        mod = 4
+        while not image[y, xc].mean() - initial > initial / 2:
+            xc= xc -1
+            count += 1
+
+            if count > 320:
+                print ('could not find head clamp edge')
+                break
+
+        cv2.circle(image, (xc, int((m*xc +c)/2)), 10, 255)
+        self.show_frame(image)
+
+        xs = []
+        ys = []
+        for i in range(0, height - height % 10, 10):
+            for k in range(0, width, 10):
+                if ((raw_image[i: i + 10, k: k + 10] - tail[0:]).min() == 0 and image[i: i + 10,
+                                                                                 k: k + 10].mean() > 50):
+                    xs.append(k)
+                    ys.append(i)
+                    # cv2.circle(image, (k, i), 10, 255)
+
+        # self.show_frame(image)
+
+
+        xl = width/2
+        xr = width/2
+        y = np.array(range(y_center/2 -5, y_center/2 +5))
+        count = 0
+        mod = 3
         l = 0
         while xr - xl < 250 and l < 10:
             l += 1
             while not image[y, xr].mean() - initial > initial / 2:
-                xr= xr+ 1
+                xr = xr + 1
                 count += 1
-                if count%mod == 0:
+                if count % mod == 0:
                     y = y + 1
 
-            y2 = np.array(range(y_center - 5, y_center + 5))
-            while not image[y2, xl].mean() - initial > initial / 2:
-                xl = xl- 1
-                count += 1
+            y2 = np.array(range(y_center/2 -5, y_center/2 +5))
 
-            if xr-xl < 200:
+            if xl - xc > 50:
+                xl = xl- 5
+                while not image[y2, xl].mean() - initial > initial / 2 :
+                    xl = xl - 1
+                    count += 1
+                if count > width/2:
+                    print ('could not find left edge of mouse')
+                    break
+
+
+            if xr - xl < 200:
                 mod = mod + 2
-            if xr-xl > 400:
+            if xr - xl > 450:
                 print ('did not find mouse back edge')
                 break
 
-        # cv2.circle(image, (xl, y2[0]), 10, 255)
+        cv2.circle(image, (xl, y_center/2), 10, 255)
         # cv2.circle(image, (xr, y[0]), 10, 255)
+        # self.show_frame(image)
 
-        y = y_center
-        xs= []
-        ys= []
+
+
+        # self.show_frame(image)
+
+        h = y_center/2
+        y = h
+        xs = []
+        ys = []
         count = 0
         interval = 20
-        for x in range(xl,xr, interval):
-            while not image[y, x+1:x+interval].mean() - initial > initial / 2 and count < y_center:
+        for x in range(xl, xr - xr%interval, interval):
+            while not image[y, x + 1:x + interval].mean() - initial > initial / 2 and count < y_center/2:
                 count += 1
                 y = y - 1
 
             count = 0
-            xs.append(x+interval)
+            xs.append(x + interval)
             ys.append(y)
-            y_center  = y_center + (interval/mod)/2
-            y = y_center
+            h= h + (interval / mod) / 2
+            y = h
 
+
+        maxy = height
+        i = 0
+        first = 0
         for item in range(len(xs)):
             cv2.circle(image, (xs[item], ys[item]), 10, 255)
+            if ys[item] < 20:
+                pass
+
+            else:
+                first = item
+
+                if ys[item] < maxy:
+                    maxy = ys[item]
+                    i = item
+
+        cv2.circle(image, (maxy, xs[i]), 10, 255)
         self.show_frame(image)
 
-        x = xs[0] - interval
-        y = ys[0]
+        print (maxy, xl)
+
+        if xc > width /2 or xc < width/4:
+            raw_image = raw_image[maxy - 10: height, width/4: width]
+        else:
+            raw_image = raw_image[maxy - 10 : height, xc - 25: width]
+
+        self.show_frame(raw_image)
+
+        # self.find_mouth(xc, ys[item], image, initial)
+
+        # if xr - xl < 150:
+        #     tail = pickle.load(open('tail.pickle', 'rb'))
+        #     height = len(raw_image)
+        #     width = len(raw_image[1])
+        #
+        #     xs = []
+        #     ys =[]
+        #     for i in range(0, height - height % 10, 10):
+        #         for k in range(0, width, 10):
+        #             if ((raw_image[i: i + 10, k: k + 10] - tail[0:]).min()) == 0 and image[i: i + 10,
+        #                                                                              k: k + 10].mean() > 50:
+        #                 # cv2.circle(raw_image, (k, i), 10, 0)
+        #                 xs.append(k)
+        #                 ys.append(i)
+        #
+        #     self.find_mouth(x_center - 100, y - 20, image, initial)
+
+
+
+    def find_mouth(self, x,y, image, initial):
+
+        while image[y, x].mean() - initial > initial / 2:
+            x= x-1
 
         while not image[y, x].max() - initial > initial / 2:
-            x = x -1
+            x = x - 1
 
-        y_init= y
+        y_init = y
         count = 0
-        while y-y_init < 20:
+        while y - y_init < 20:
             count += 1
             while image[y, x].mean() - initial > initial / 2:
                 y = y + 1
 
             while not image[y, x].max() - initial > initial / 2:
-                y= y + 1
+                y = y + 1
 
             if count > 100:
                 print ('Could not find mouth')
                 break
-
-        print(x,y)
-
-        # cv2.circle(image, (x, y), 10, 255)
+        cv2.circle(image, (x, y), 10, 0)
         self.show_frame(image)
+
+        return {'x':x, 'y':y}
+
+
 
     def detect_tail(self, frame):
 
-        self.show_frame(frame)
-        
+        # self.show_frame(frame)
+
+        PATCH_SIZE = 10
+
+        tail_locations = [(290, 480), (270, 460), (250, 420), (220,390), (180,390), (150, 420), (155, 460), (165, 500), (175, 540),(185, 570),
+                          (190, 600), (190, 620)]
+        tail_patches = []
+
+         # pick out image tail patches
+        for loc in tail_locations:
+            tail_patches.append(frame[loc[0]:(loc[0] + PATCH_SIZE),
+                            loc[1]:(loc[1] + PATCH_SIZE)])
+
+            # To visualize areas, uncomment line below
+            # cv2.circle(frame, (loc[1], loc[0]), 10, 0)
+
+        with open("tail.pickle", 'wb') as f:
+            pickle.dump(tail_patches, f)
+
 
 
     def crop_wheel(self, image, rawimage, xpoints, ypoints, width, height):
@@ -482,12 +585,9 @@ class ImageProcessing:
                 if i > m*k + c:
                     rawimage[i,k] = 255
 
-        self.show_frame(rawimage)
-        return rawimage
+        # self.show_frame(rawimage)
+        return {'image':rawimage, 'height': int(m*width/2 + (c-10)), 'm': m, 'c':c -10}
 
-
-def func(x, a, b, c, d, e,f,g):
-    return a*x*x*x*x*x*x + b*x*x*x*x*x + c*x*x*x*x + d*x*x*x + e*x*x + f*x + g
 
 
 
