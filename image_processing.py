@@ -181,13 +181,14 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        self.video_pointer.set(1, 92060)
+        frame_number = 50000
+        self.video_pointer.set(1, frame_number)
         ret, frame = self.video_pointer.read()
 
         self.show_frame(frame)
         # tail = self.detect_tail(frame)
 
-        t1 = time.time()
+
         # calculate frame dimensions
         height= len(frame)
         width= len(frame[1])
@@ -214,7 +215,7 @@ class ImageProcessing:
             except:
                 print ('mouse height position is unexpected')
                 sys.exit()
-        self.show_frame(mouse['rawimage'])
+
         # find center of mouse
         # center = self.find_mouse_center(mouse['image'])
 
@@ -224,9 +225,25 @@ class ImageProcessing:
         # fill mouse up from reference point generate by find_mouse_center
         mouse_image = self.fill_mouse(mouse['image'], mouse['rawimage'], no_wheel['height'], mouse['initial'], no_wheel['m'], no_wheel['c'])
 
-        t2 = time.time()
+        # error detection check!
+        # if processed outputs have unreasonably small dimensions, or contain too little feature points
+        # record frame number for error tracking and use unprocessed images
+        errors = []
+        error_rawimage = []
+        error_edgeimage = []
+        if len(mouse_image['raw_image']) < 120 or len(mouse_image['raw_image'][1]) < width/2 or len(mouse_image['tail_feet'][0]) < 25 or len(mouse_image['tail_feet'][0]) > 300:
+            print ('image processing failed, will display raw frame')
+            if len(no_wheel['rawimage']) < 120 or len(no_wheel['rawimage']) < width/2:
+                errors.append(frame_number)
+                error_rawimage.append(crop)
+                error_edgeimage.append(crop)
+            else:
+                errors.append(frame_number)
+                error_rawimage.append(no_wheel['rawimage'])
+                error_edgeimage.append(no_wheel['image'])
 
-        print(t2-t1)
+
+
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
@@ -394,11 +411,11 @@ class ImageProcessing:
 
             if xl - xc > 50:
                 xl = xl - 5
-                while not image[y2, xl].mean() - initial > initial / 2 and xl > 1:
+                while not image[y2, xl].mean() - initial > initial / 2:
                     xl = xl - 1
                     count += 1
                 if count > width / 2:
-                    print ('could not find left edge of mouse')
+                    xl = width/4
                     break
 
             if xr - xl < 200:
@@ -480,7 +497,7 @@ class ImageProcessing:
         self.show_frame(image)
         self.show_frame(raw_image)
 
-        return {'raw_image': raw_image, 'edge image': image, 'head':(xc, int((m * xc + c) / 2)), 'mouse_left': (xl,y_center/2), 'mouse_right': (xr,right_y), 'mouse_back': (xsu,ysu), 'tail_feet': (xs,ys)}
+        return {'raw_image': raw_image, 'edge_image': image, 'head':(xc, int((m * xc + c) / 2)), 'mouse_left': (xl,y_center/2), 'mouse_right': (xr,right_y), 'mouse_back': (xsu,ysu), 'tail_feet': (xs,ys)}
 
 
     def detect_tail(self, frame):
@@ -568,7 +585,7 @@ class ImageProcessing:
                 if i > m*k + c:
                     rawimage[i,k] = 255
 
-        self.show_frame(rawimage)
+        # self.show_frame(rawimage)
         return {'image':rawimage, 'height': int(m*width/2 + (c-10)), 'm': m, 'c':c -10}
 
 
