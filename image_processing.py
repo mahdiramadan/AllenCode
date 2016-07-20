@@ -16,7 +16,6 @@ from sklearn.decomposition import PCA
 import scipy.optimize as optimization
 
 
-
 class ImageProcessing:
     def __init__(self, exp_folder, lims_ID):
 
@@ -37,145 +36,6 @@ class ImageProcessing:
 
     def is_valid(self):
         return self.data_present
-
-    def get_wheel_data(self):
-        # gets raw wheel data
-        return self.sb.raw_mouse_wheel()
-
-    def plot_wheel_data(self):
-        # plots raw wheel data
-        return self.sb.plot_raw_mouse_wheel()
-
-    def plot_norm_data(self):
-
-        # plot normalized wheel data
-        data = self.normalize_wheel_data()
-
-        plt.figure()
-        plt.plot(data)
-        plt.xlabel("Frames")
-        plt.ylabel("norm wheel")
-        fig1 = plt.gcf()
-        return fig1
-
-    def normalize_wheel_data(self):
-        # since the fps of wheel data is about twice of the behavior video, we need to normalize
-        # wheel data to the same fps
-
-        # get wheel data
-        wheel = self.get_wheel_data()
-        wheel_indices = range(0, len(wheel))
-
-        # get video frames
-        frames = self.ep.get_per_frame_data()[0]
-
-        # get video fps
-        fps = self.sv.get_fps()
-
-        fps_ratio= (len(wheel)/float(len(frames)))
-        fps_wheel = fps*fps_ratio
-
-        normal_wheel = []
-
-        # initiate first frame
-        normal_wheel.append(wheel[0])
-
-
-        # For every behavior frame, get the closest wheel frame, the next and previous wheel frame,
-        # and then add the average of these three values to the normalized wheel data
-        for i in frames[1:len(frames)-1]:
-
-
-            closest = wheel[int(i*fps_ratio)]
-            next = wheel[int(i*fps_ratio + 1)]
-            previous = wheel[int(i*fps_ratio -1)]
-            avg = (closest + next + previous)/3.0
-            normal_wheel.append(closest)
-
-        # add the last wheel frame
-        normal_wheel.append(wheel[-1])
-
-
-        return normal_wheel
-
-
-    def show_frame(self, frame):
-        cv2.imshow('image', frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    def image_contrast(self, img_grey, alpha, beta):
-
-        # increase contrast
-        alpha = float(alpha)
-        beta = float(beta)
-        # alpha controls gain (contrast)
-        self.array_alpha = np.array([alpha])
-        # beta controls bias (brightness)
-        self.array_beta = np.array([beta])
-
-        # add a beta value to every pixel
-        cv2.add(img_grey, self.array_beta, img_grey)
-
-        # multiply every pixel value by alpha
-        cv2.multiply(img_grey, self.array_alpha, img_grey)
-
-        return img_grey
-
-
-    def sharpen_image(self, image, value):
-
-        kernel = np.zeros((9, 9), np.float32)
-        # Identity, times two!
-        kernel[4, 4] = value
-
-        # Create a box filter:
-        boxFilter = np.ones((9, 9), np.float32) / 81.0
-
-        # Subtract the two:
-        kernel = kernel - boxFilter
-
-        # Note that we are subject to overflow and underflow here...but I believe that
-        # filter2D clips top and bottom ranges on the output, plus you'd need a
-        # very bright or very dark pixel surrounded by the opposite type.
-
-        image = cv2.filter2D(image, -1, kernel)
-
-        return image
-
-    def select_foreground(self,frame, width, height):
-
-        # convert to grey scale
-        img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # apply gaussian blur filter
-        gauss = cv2.GaussianBlur(img_grey, (7, 7), 0)
-
-        # increase contrast
-        img_contrast = self.image_contrast(gauss, 0.5, -100)
-
-        # threshold
-        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_OTSU)
-
-        # sharpen image
-        img_sharp = self.sharpen_image(img, 8.0)
-
-        # noise removal
-        kernel = np.ones((3, 3), np.uint8)
-        opening = cv2.morphologyEx(img_sharp, cv2.MORPH_OPEN, kernel, iterations=2)
-
-        # background
-        sure_bg = cv2.dilate(opening, kernel, iterations=3)
-
-        # foreground
-        dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
-        ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
-
-        # unknown region
-        sure_fg = np.uint8(sure_fg)
-        unknown = cv2.subtract(sure_bg, sure_fg)
-
-        return sure_fg
 
 
     def image_segmentation(self):
@@ -232,7 +92,7 @@ class ImageProcessing:
         error_rawimage = []
         error_edgeimage = []
         if len(mouse_image['raw_image']) < 120 or len(mouse_image['raw_image'][1]) < width/2 or len(mouse_image['tail_feet'][0]) < 25 or len(mouse_image['tail_feet'][0]) > 300:
-            print ('image processing failed, will display raw frame')
+            print ('image processing failed, will use raw frame')
             if len(no_wheel['rawimage']) < 120 or len(no_wheel['rawimage']) < width/2:
                 errors.append(frame_number)
                 error_rawimage.append(crop)
@@ -243,7 +103,82 @@ class ImageProcessing:
                 error_edgeimage.append(no_wheel['image'])
 
 
+    def show_frame(self, frame):
+        cv2.imshow('image', frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
+    def image_contrast(self, img_grey, alpha, beta):
+
+        # increase contrast
+        alpha = float(alpha)
+        beta = float(beta)
+        # alpha controls gain (contrast)
+        self.array_alpha = np.array([alpha])
+        # beta controls bias (brightness)
+        self.array_beta = np.array([beta])
+
+        # add a beta value to every pixel
+        cv2.add(img_grey, self.array_beta, img_grey)
+
+        # multiply every pixel value by alpha
+        cv2.multiply(img_grey, self.array_alpha, img_grey)
+
+        return img_grey
+
+    def sharpen_image(self, image, value):
+
+        kernel = np.zeros((9, 9), np.float32)
+        # Identity, times two!
+        kernel[4, 4] = value
+
+        # Create a box filter:
+        boxFilter = np.ones((9, 9), np.float32) / 81.0
+
+        # Subtract the two:
+        kernel = kernel - boxFilter
+
+        # Note that we are subject to overflow and underflow here...but I believe that
+        # filter2D clips top and bottom ranges on the output, plus you'd need a
+        # very bright or very dark pixel surrounded by the opposite type.
+
+        image = cv2.filter2D(image, -1, kernel)
+
+        return image
+
+    def select_foreground(self, frame, width, height):
+
+        # convert to grey scale
+        img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # apply gaussian blur filter
+        gauss = cv2.GaussianBlur(img_grey, (7, 7), 0)
+
+        # increase contrast
+        img_contrast = self.image_contrast(gauss, 0.5, -100)
+
+        # threshold
+        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_OTSU)
+
+        # sharpen image
+        img_sharp = self.sharpen_image(img, 8.0)
+
+        # noise removal
+        kernel = np.ones((3, 3), np.uint8)
+        opening = cv2.morphologyEx(img_sharp, cv2.MORPH_OPEN, kernel, iterations=2)
+
+        # background
+        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+
+        # foreground
+        dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
+        ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
+
+        # unknown region
+        sure_fg = np.uint8(sure_fg)
+        unknown = cv2.subtract(sure_bg, sure_fg)
+
+        return sure_fg
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
