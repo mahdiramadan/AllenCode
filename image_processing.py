@@ -12,8 +12,8 @@ import cv2
 import sys
 import pickle
 import time
-from sklearn.decomposition import PCA
-import scipy.optimize as optimization
+from skimage.feature import hog
+from skimage import data, color, exposure
 
 
 class ImageProcessing:
@@ -41,13 +41,13 @@ class ImageProcessing:
     def image_segmentation(self):
 
         # get frame at specified frame number
-        frame_number = 50000
+        frame_number = 60000
         self.video_pointer.set(1, frame_number)
         ret, frame = self.video_pointer.read()
 
         self.show_frame(frame)
-        # tail = self.detect_tail(frame)
 
+        # tail = self.detect_tail(frame)
 
         # calculate frame dimensions
         height= len(frame)
@@ -58,7 +58,7 @@ class ImageProcessing:
 
         # crop image
         where = 140
-        crop = self. crop_image(frame, foreground, width, height, where)
+        crop = self. crop_image(frame, foreground['sure_fg'], width, height, where)
 
 
         # select mouse
@@ -69,7 +69,7 @@ class ImageProcessing:
         while mouse['range'] < 180:
             try:
                 where = where - 10
-                crop = self.crop_image(frame, foreground, width, height, where)
+                crop = self.crop_image(frame, foreground['sure_fg'], width, height, where)
                 mouse = self.select_image_range(crop, crop, width, height)
 
             except:
@@ -83,7 +83,9 @@ class ImageProcessing:
         no_wheel = self.crop_wheel(mouse['image'], mouse['rawimage'], mouse['xpoints'], mouse['ypoints'], mouse['width'], mouse['height'])
 
         # fill mouse up from reference point generate by find_mouse_center
-        mouse_image = self.fill_mouse(mouse['image'], mouse['rawimage'], no_wheel['height'], mouse['initial'], no_wheel['m'], no_wheel['c'])
+        mouse_image = self.fill_mouse(mouse['image'], mouse['rawimage'], no_wheel['height'], mouse['initial'], no_wheel['m'], no_wheel['c'], foreground['unknown'])
+
+        self.extra_background_filtering(mouse['rawimage'])
 
         # error detection check!
         # if processed outputs have unreasonably small dimensions, or contain too little feature points
@@ -158,7 +160,7 @@ class ImageProcessing:
         img_contrast = self.image_contrast(gauss, 0.5, -100)
 
         # threshold
-        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_OTSU)
+        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         # sharpen image
         img_sharp = self.sharpen_image(img, 8.0)
@@ -167,10 +169,10 @@ class ImageProcessing:
         kernel = np.ones((3, 3), np.uint8)
         opening = cv2.morphologyEx(img_sharp, cv2.MORPH_OPEN, kernel, iterations=2)
 
-        # background
+        # select background
         sure_bg = cv2.dilate(opening, kernel, iterations=3)
 
-        # foreground
+        # select foreground
         dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
         ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
 
@@ -178,7 +180,7 @@ class ImageProcessing:
         sure_fg = np.uint8(sure_fg)
         unknown = cv2.subtract(sure_bg, sure_fg)
 
-        return sure_fg
+        return {'sure_fg':sure_fg, 'unknown': unknown}
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
@@ -220,7 +222,7 @@ class ImageProcessing:
         for up in range(h-1, 0, -1):
             if image[up, w/2: w-1].max() - initial > initial - initial / 2:
                 bottom = up
-                if bottom > h*0.8:
+                if bottom > h*0.9:
                     continue
                 else:
                     break
@@ -296,7 +298,7 @@ class ImageProcessing:
 
         return {'x_center': x_center, 'y_center': y_center}
 
-    def fill_mouse(self, image, raw_image, y_center, initial, m , c):
+    def fill_mouse(self, image, raw_image, y_center, initial, m , c, unknown):
 
         # load tail patch data
         tail = pickle.load(open('tail.pickle', 'rb'))
@@ -525,7 +527,17 @@ class ImageProcessing:
 
 
 
+    def extra_background_filtering(self, raw_image):
+        orientation = color.rgb2gray(raw_image)
+        fd, hog_image = hog(orientation, orientations=4, pixels_per_cell=(20, 20),
+                            cells_per_block=(2, 2), visualise=True)
+        hog_image_rescaled = exposure.rescale_intensity(hog_image, in_range=(0, 0.02))
+        fig1 = plt.figure()
+        ax = fig1.add_subplot(111)
+        ax.imshow(hog_image_rescaled, cmap=plt.cm.gray)
+        plt.show()
 
+    # def optical_image_flow(self):
 
 
 
