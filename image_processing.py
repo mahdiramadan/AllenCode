@@ -42,42 +42,43 @@ class ImageProcessing:
     def run_whole_video(self):
 
         # wheel_data = self.wd.normalize_wheel_data()
-
+        self.video_pointer.set(1, 100000)
         ret, frame = self.video_pointer.read()
-        self.show_frame(frame)
-        frames = []
-        opticals = []
-        angles = []
-        prvs = self.image_segmentation(frame)
-        frames.append(prvs)
+        fgbg = cv2.BackgroundSubtractorMOG()
 
-        while ret:
+        while (1):
             ret, frame = self.video_pointer.read()
-            data = self.image_segmentation(frame)
-            frames.append(data['image'])
-            optical = self.optical_flow(prvs, data['image'])
-            opticals.append(optical['mag'])
-            angles.append(optical['ang'])
-            prvs = data['image']
+
+            fgmask = fgbg.apply(frame)
+
+            cv2.imshow('frame', fgmask)
+            k = cv2.waitKey(30) & 0xff
+            if k == 27:
+                break
+
+        self.video_pointer.release()
+        cv2.destroyAllWindows()
 
 
 
-    def image_segmentation(self, frame):
+    def image_segmentation(self, frame, fgbg):
 
         # tail = self.detect_tail(frame)
 
         # calculate frame dimensions
-        height= len(frame)
-        width= len(frame[1])
-
+        # height= len(frame)
+        # width= len(frame[1])
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         # select foreground
-        foreground = self.select_foreground(frame, width, height)
+        foreground = self.select_foreground(frame, fgbg, kernel)
+
+        cv2.destroyAllWindows()
 
         # crop image
-        where = 160
-        crop = self. crop_image(frame, foreground['sure_fg'], width, height, where)
+        # where = 160
+        # crop = self. crop_image(frame, foreground['sure_fg'], width, height, where)
 
-        return {'image': crop}
+
 
     def show_frame(self, frame):
         cv2.imshow('image', frame)
@@ -122,10 +123,10 @@ class ImageProcessing:
 
         return image
 
-    def select_foreground(self, frame, width, height):
+    def select_foreground(self, frame, fgbg, kernel):
 
-        # convert to grey scale
-        img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # # convert to grey scale
+        # img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # # apply gaussian blur filter
         # gauss = cv2.GaussianBlur(img_grey, (7, 7), 0)
@@ -154,9 +155,14 @@ class ImageProcessing:
         # sure_fg = np.uint8(sure_fg)
         # unknown = cv2.subtract(sure_bg, sure_fg)
 
-        
 
-        return {'sure_fg': sure_fg, 'unknown': unknown}
+        fgmask = fgbg.apply(frame)
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+        cv2.imshow('frame', fgmask)
+        cv2.waitKey()
+
+
+        return {'sure_fg': frame}
 
     def crop_image(self, frame, sure_fg, width, height, where):
 
