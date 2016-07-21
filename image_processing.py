@@ -41,8 +41,8 @@ class ImageProcessing:
 
     def run_whole_video(self):
 
-        # wheel_data = self.wd.normalize_wheel_data()
-        self.video_pointer.set(1, 36000)
+        wheel_data = self.wd.normalize_wheel_data()
+        self.video_pointer.set(1, 36200)
         ret, frame = self.video_pointer.read()
         frames = []
         opticals = []
@@ -56,8 +56,10 @@ class ImageProcessing:
         count = 0
 
         while count < 5000:
+
             frame = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
             next = frame
+            frames.append(next)
             # data = self.image_segmentation(frame)
             # frames.append(data['image'])
             optical = self.optical_flow(prvs, next)
