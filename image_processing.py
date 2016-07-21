@@ -42,7 +42,7 @@ class ImageProcessing:
     def run_whole_video(self):
 
         wheel_data = self.wd.normalize_wheel_data()
-        self.video_pointer.set(1, 36200)
+        # self.video_pointer.set(1, 36200)
         ret, frame = self.video_pointer.read()
         frames = []
         opticals = []
@@ -51,11 +51,11 @@ class ImageProcessing:
         ret, frame = self.video_pointer.read()
         # prvs = self.image_segmentation(frame)
         frames.append(prvs)
-        hsv = np.zeros_like(frame[160:420, 100:640])
-        hsv[..., 1] = 255
+        # hsv = np.zeros_like(frame[160:420, 100:640])
+        # hsv[..., 1] = 255
         count = 0
 
-        while count < 5000:
+        while count < len(wheel_data):
 
             frame = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
             next = frame
@@ -65,25 +65,38 @@ class ImageProcessing:
             optical = self.optical_flow(prvs, next)
             opticals.append(optical['mag'])
             angles.append(optical['ang'])
-            hsv[..., 0] = optical['ang'] * 180 / np.pi / 2
-            hsv[..., 2] = cv2.normalize(optical['mag'], None, 0, 255, cv2.NORM_MINMAX)
-            rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-            cv2.imshow('frame2', rgb)
-            k = cv2.waitKey(30) & 0xff
-            if k == 27:
-                break
-            elif k == ord('s'):
-                cv2.imwrite('opticalfb.png', next)
-                cv2.imwrite('opticalhsv.png', rgb)
+            # hsv[..., 0] = optical['ang'] * 180 / np.pi / 2
+            # hsv[..., 2] = cv2.normalize(optical['mag'], None, 0, 255, cv2.NORM_MINMAX)
+            # rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            #
+            # cv2.imshow('frame2', rgb)
+            # k = cv2.waitKey(30) & 0xff
+            # if k == 27:
+            #     break
+            # elif k == ord('s'):
+            #     cv2.imwrite('opticalfb.png', next)
+            #     cv2.imwrite('opticalhsv.png', rgb)
 
             prvs = next
             ret, frame = self.video_pointer.read()
             count += 1
 
-        self.video_pointer.release()
-        cv2.destroyAllWindows()
-            # prvs = data['image']
+        with open("optical.pickle", 'wb') as f:
+            pickle.dump(opticals, f)
+
+        with open("angle.pickle", 'wb') as f:
+            pickle.dump(angles, f)
+
+        with open("wheel.pickle", 'wb') as f:
+            pickle.dump(wheel_data, f)
+
+        with open("frames.pickle", 'wb') as f:
+            pickle.dump(frames, f)
+
+
+        # self.video_pointer.release()
+        # cv2.destroyAllWindows()
+        #     # prvs = data['image']
 
 
 
