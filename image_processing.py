@@ -26,15 +26,15 @@ class ImageProcessing:
                 self.directory = exp_folder
                 self.file_string = os.path.join(exp_folder, file)
                 self.sb = sb(exp_folder)
-                self.wd = wd (exp_folder, lims_ID)
+                self.wd = wd(exp_folder, lims_ID)
                 self.ep = ep(exp_folder, lims_ID)
-                self.sv = sv (exp_folder, lims_ID)
+                self.sv = sv(exp_folder, lims_ID)
                 self.video_pointer = cv2.VideoCapture(self.file_string)
 
         if os.path.isfile(self.file_string):
-                self.data_present = True
+            self.data_present = True
         else:
-                self.data_present = False
+            self.data_present = False
 
     def is_valid(self):
         return self.data_present
@@ -42,43 +42,65 @@ class ImageProcessing:
     def run_whole_video(self):
 
         # wheel_data = self.wd.normalize_wheel_data()
-        self.video_pointer.set(1, 100000)
+        self.video_pointer.set(1, 36000)
         ret, frame = self.video_pointer.read()
-        fgbg = cv2.BackgroundSubtractorMOG()
+        frames = []
+        opticals = []
+        angles = []
+        prvs = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
+        ret, frame = self.video_pointer.read()
+        # prvs = self.image_segmentation(frame)
+        frames.append(prvs)
+        hsv = np.zeros_like(frame[160:420, 100:640])
+        hsv[..., 1] = 255
+        count = 0
 
-        while (1):
-            ret, frame = self.video_pointer.read()
+        while count < 5000:
+            frame = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
+            next = frame
+            # data = self.image_segmentation(frame)
+            # frames.append(data['image'])
+            optical = self.optical_flow(prvs, next)
+            opticals.append(optical['mag'])
+            angles.append(optical['ang'])
+            hsv[..., 0] = optical['ang'] * 180 / np.pi / 2
+            hsv[..., 2] = cv2.normalize(optical['mag'], None, 0, 255, cv2.NORM_MINMAX)
+            rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            fgmask = fgbg.apply(frame)
-
-            cv2.imshow('frame', fgmask)
+            cv2.imshow('frame2', rgb)
             k = cv2.waitKey(30) & 0xff
             if k == 27:
                 break
+            elif k == ord('s'):
+                cv2.imwrite('opticalfb.png', next)
+                cv2.imwrite('opticalhsv.png', rgb)
+
+            prvs = next
+            ret, frame = self.video_pointer.read()
+            count += 1
 
         self.video_pointer.release()
         cv2.destroyAllWindows()
+            # prvs = data['image']
 
 
 
-    def image_segmentation(self, frame, fgbg):
+    def image_segmentation(self, frame):
 
         # tail = self.detect_tail(frame)
 
         # calculate frame dimensions
-        # height= len(frame)
-        # width= len(frame[1])
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        # select foreground
-        foreground = self.select_foreground(frame, fgbg, kernel)
+        height = len(frame)
+        width = len(frame[1])
 
-        cv2.destroyAllWindows()
+        # # select foreground
+        # foreground = self.select_foreground(frame, width, height)
 
         # crop image
-        # where = 160
-        # crop = self. crop_image(frame, foreground['sure_fg'], width, height, where)
+        where = 160
+        crop = self.crop_image(frame, where)
 
-
+        return {'image': crop}
 
     def show_frame(self, frame):
         cv2.imshow('image', frame)
@@ -123,78 +145,56 @@ class ImageProcessing:
 
         return image
 
-    def select_foreground(self, frame, fgbg, kernel):
+    def select_foreground(self, frame, width, height):
 
-        # # convert to grey scale
-        # img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # convert to grey scale
+        img_grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # # apply gaussian blur filter
-        # gauss = cv2.GaussianBlur(img_grey, (7, 7), 0)
-        #
-        # # increase contrast
-        # img_contrast = self.image_contrast(gauss, 0.5, -100)
-        #
-        # # threshold
-        # ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        #
-        # # sharpen image
-        # img_sharp = self.sharpen_image(img, 8.0)
-        #
-        # # noise removal
-        # kernel = np.ones((3, 3), np.uint8)
-        # opening = cv2.morphologyEx(img_sharp, cv2.MORPH_OPEN, kernel, iterations=2)
-        #
-        # # select background
-        # sure_bg = cv2.dilate(opening, kernel, iterations=3)
-        #
-        # # select foreground
-        # dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
-        # ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
-        #
-        # # unknown region
-        # sure_fg = np.uint8(sure_fg)
-        # unknown = cv2.subtract(sure_bg, sure_fg)
+        # apply gaussian blur filter
+        gauss = cv2.GaussianBlur(img_grey, (7, 7), 0)
 
+        # increase contrast
+        img_contrast = self.image_contrast(gauss, 0.5, -100)
 
-        fgmask = fgbg.apply(frame)
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
-        cv2.imshow('frame', fgmask)
-        cv2.waitKey()
+        # threshold
+        ret, img = cv2.threshold(img_contrast, 200, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # sharpen image
+        img_sharp = self.sharpen_image(img, 8.0)
+
+        # noise removal
+        kernel = np.ones((3, 3), np.uint8)
+        opening = cv2.morphologyEx(img_sharp, cv2.MORPH_OPEN, kernel, iterations=2)
+
+        # select background
+        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+
+        # select foreground
+        dist_transform = cv2.distanceTransform(opening, cv2.cv.CV_DIST_L2, 5)
+        ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
+
+        # unknown region
+        sure_fg = np.uint8(sure_fg)
+        unknown = cv2.subtract(sure_bg, sure_fg)
 
 
-        return {'sure_fg': frame}
+        return {'sure_fg': sure_fg, 'unknown': unknown}
 
-    def crop_image(self, frame, sure_fg, width, height, where):
+    def crop_image(self, frame, where):
 
         # image processed without background (size is 480 x 640), based
         # on output of threshold function in select_foreground
 
-        for i in range(0, height):
-            # where determines how much top of image is removed
-            m = 0.28
-            c = 240
-            for j in range(0, width):
-                if sure_fg[i, j] != 0:
-                        frame[i, j] = 255
-                if i > m * j + c:
-                    frame[i, j] = 255
-
         frame = frame[where:420, 100:640]
 
-        self.show_frame(frame)
-
         return frame
-
 
     def optical_flow(self, prvs, next):
 
         # prvs = np.asarray(prvs)
         # next = np.asarray(next)
-        #
-        # prvs = cv2.cvtColor(prvs, cv2.COLOR_BGR2GRAY)
-        # next = cv2.cvtColor(next, cv2.COLOR_BGR2GRAY)
 
-        flow = cv2.calcOpticalFlowFarneback(prvs, next, None, 0.5, 3, 15, 3, 5, 1, 0)
+        flow = cv2.calcOpticalFlowFarneback(prvs, next, 0.5, 3, 15, 3, 5, 1.2, 0)
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
 
         return {'mag': mag, 'ang': ang}
