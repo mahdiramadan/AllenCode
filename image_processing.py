@@ -16,7 +16,6 @@ import tables
 import h5py
 
 
-
 class ImageProcessing:
     def __init__(self, exp_folder, lims_ID):
 
