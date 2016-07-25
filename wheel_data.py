@@ -58,6 +58,9 @@ class WheelData:
         fig1 = plt.gcf()
         return fig1
 
+    def wheel_data_length(self):
+        return len( self.ep.get_per_frame_data()[0])
+
     def normalize_wheel_data(self):
         # since the fps of wheel data is about twice of the behavior video, we need to normalize
         # wheel data to the same fps
