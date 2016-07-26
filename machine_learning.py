@@ -21,6 +21,10 @@ from sklearn.metrics import classification_report
 from sklearn.svm import SVC
 from sklearn import preprocessing
 from sklearn.externals import joblib
+from itertools import product
+from math import floor, pi
+from scipy.ndimage.measurements import sum as ndi_sum
+import time
 
 class MachineLearning:
     def __init__(self, exp_folder, lims_ID):
@@ -96,18 +100,13 @@ class MachineLearning:
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
-            for f in range(500, 600):
-                frame = np.array(group.get('frames'))[f]
-                orientation = color.rgb2gray(frame)
-                fd, hog_image = hog(orientation, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(4, 4), visualise=True)
-                hog_image = np.reshape(hog_image, (1, dimension))
+            for f in range(500, 520):
 
-                orientation = color.rgb2gray(np.array(group.get('optical'))[f])
-                fd, hog_optical = hog(orientation, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(4, 4),
-                                    visualise=True)
-                optical = np.reshape(hog_optical, (1,dimension))
+                hog = cv2.HOGDescriptor()
+                h = hog.compute(np.array(group.get('frames'))[f])
+                h2 = hog.compute(np.array(group.get('optical'))[f])
                 angles = np.reshape(np.array(group.get('angles'))[f], (1,dimension))
-                final_data.append(np.concatenate((hog_image, optical, angles), axis = 1))
+                final_data.append(np.concatenate((h, h2, angles), axis = 1))
 
         final_data = np.vstack(final_data)
 
@@ -115,9 +114,53 @@ class MachineLearning:
         index = self.ep.get_labels().index(label) + 1
         labeled_vector = np.array(self.ep.get_per_frame_data()[index])
 
-        return {'feature_data': final_data, 'label': labeled_vector[500:600]}
+        return {'feature_data': final_data, 'label': labeled_vector[500:520]}
 
-
-
-
-
+    # def findHOGFeaturesVect(self, img, n_divs=6, n_bins=6):
+    #     """
+    #     **SUMMARY**
+    #     Get HOG(Histogram of Oriented Gradients) features from the image.
+    #
+    #
+    #     **PARAMETERS**
+    #     * *img*    - SimpleCV.Image instance
+    #     * *n_divs* - the number of divisions(cells).
+    #     * *n_divs* - the number of orientation bins.
+    #
+    #     **RETURNS**
+    #     Returns the HOG vector in a numpy array
+    #
+    #     """
+    #     # Size of HOG vector
+    #     n_HOG = n_divs * n_divs * n_bins
+    #
+    #     # Initialize output HOG vector
+    #     # HOG = [0.0]*n_HOG
+    #     HOG = np.zeros((n_HOG, 1))
+    #
+    #     # Apply sobel on image to find x and y orientations of the image
+    #     Ix = cv2.Sobel(img, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=3)
+    #     Iy = cv2.Sobel(img, ddepth=cv2.CV_32F, dx=0, dy=1, ksize=3)
+    #
+    #     height = len(img)
+    #     width = len(img[0])
+    #
+    #     # Area of image
+    #     img_area = height * width
+    #
+    #     # Range of each bin
+    #     BIN_RANGE = (2 * pi) / n_bins
+    #
+    #     # m = 0
+    #     angles = np.arctan2(Iy, Ix)
+    #     magnit = ((Ix ** 2) + (Iy ** 2)) ** 0.5
+    #
+    #     bins = np.int16((angles[..., 0] % (2 * pi) / BIN_RANGE))
+    #     y, x = np.meshgrid(np.arange(height), np.arange(width))
+    #     x = np.int16(x / width * n_divs)
+    #     y = np.int16(y / height * n_divs)
+    #     labels = (x * n_divs + y) * n_bins + bins
+    #     index = np.arange(n_HOG)
+    #     HOG = ndi_sum(magnit[..., 0], labels, index)
+    #
+    #     return HOG / img_area
