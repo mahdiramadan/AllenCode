@@ -36,11 +36,11 @@ class MachineLearning:
 
         input = self.get_data()
 
-        X_train = preprocessing.StandardScaler().fit(input['feature_data'][0:50]).transform(input['feature_data'][0:50])
-        X_test = preprocessing.StandardScaler().fit(input['feature_data'][50:100]).transform(input['feature_data'][50:100])
+        X_train = preprocessing.StandardScaler().fit(input['feature_data'][0:5000]).transform(input['feature_data'][0:5000])
+        X_test = preprocessing.StandardScaler().fit(input['feature_data'][5000:10000]).transform(input['feature_data'][5000:10000])
 
-        y_train = input['label'][0:50]
-        y_test = input['label'][50:100]
+        y_train = input['label'][0:5000]
+        y_test = input['label'][5000:10000]
 
 
         # # Set the parameters by cross-validation
@@ -95,18 +95,27 @@ class MachineLearning:
         dimension = 260*540
         wheel = pickle.load(open('wheel.pickle', 'rb'))
         # wheel = preprocessing.StandardScaler().fit(wheel).transform(wheel)
+        count = 0
 
         for item in range(1, 2):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
-            for f in range(500, 520):
+            frames = np.array(group.get('frames'))
+            opticals = np.array(group.get('optical'))
+            angles = np.array(group.get('angles'))
+            count += 1
+            print ('first ' + str(count) + '000 frames')
+
+            for f in range(0,100):
 
                 hog = cv2.HOGDescriptor()
-                h = hog.compute(np.array(group.get('frames'))[f])
-                h2 = hog.compute(np.array(group.get('optical'))[f])
-                angles = np.reshape(np.array(group.get('angles'))[f], (1,dimension))
-                final_data.append(np.concatenate((h, h2, angles), axis = 1))
+                h = hog.compute(frames[f])
+                dim = len(h)
+                h= np.reshape(h, (1,dim))
+                optical = np.reshape(opticals[f], (1, dimension))
+                angle = np.reshape(angles[f], (1, dimension))
+                final_data.append(np.hstack((h, optical, angle)))
 
         final_data = np.vstack(final_data)
 
@@ -114,7 +123,7 @@ class MachineLearning:
         index = self.ep.get_labels().index(label) + 1
         labeled_vector = np.array(self.ep.get_per_frame_data()[index])
 
-        return {'feature_data': final_data, 'label': labeled_vector[500:520]}
+        return {'feature_data': final_data, 'label': labeled_vector}
 
     # def findHOGFeaturesVect(self, img, n_divs=6, n_bins=6):
     #     """
