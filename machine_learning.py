@@ -21,10 +21,12 @@ from sklearn.metrics import classification_report
 from sklearn.svm import SVC
 from sklearn import preprocessing
 from sklearn.externals import joblib
+from sklearn.ensemble import RandomForestClassifier
 from itertools import product
 from math import floor, pi
 from scipy.ndimage.measurements import sum as ndi_sum
 import time
+from sklearn.decomposition import PCA, IncrementalPCA
 
 class MachineLearning:
     def __init__(self, exp_folder, lims_ID):
@@ -36,11 +38,11 @@ class MachineLearning:
 
         input = self.get_data()
 
-        X_train = preprocessing.StandardScaler().fit(input['feature_data'][0:5000]).transform(input['feature_data'][0:5000])
-        X_test = preprocessing.StandardScaler().fit(input['feature_data'][5000:10000]).transform(input['feature_data'][5000:10000])
+        X_train = input['feature_data'][0:8000]
+        X_test = input['feature_data'][8000:10000]
 
-        y_train = input['label'][0:5000]
-        y_test = input['label'][5000:10000]
+        y_train = np.reshape(input['label'][0:8000], (8000, 1))
+        y_test = np.reshape(input['label'][8000:10000], (2000,1))
 
 
         # # Set the parameters by cross-validation
@@ -78,7 +80,7 @@ class MachineLearning:
         #     print(classification_report(y_true, y_pred))
         #     print()
 
-        clf = SVC(kernel='linear', C=0.1, class_weight='auto')
+        clf = RandomForestClassifier(verbose=3)
         clf.fit(X_train, y_train)
 
         joblib.dump(clf, 'clf.pkl')
@@ -97,7 +99,7 @@ class MachineLearning:
         # wheel = preprocessing.StandardScaler().fit(wheel).transform(wheel)
         count = 0
 
-        for item in range(1, 2):
+        for item in range(1, 11):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
@@ -107,15 +109,29 @@ class MachineLearning:
             count += 1
             print ('first ' + str(count) + '000 frames')
 
-            for f in range(0,100):
 
-                hog = cv2.HOGDescriptor()
-                h = hog.compute(frames[f])
-                dim = len(h)
-                h= np.reshape(h, (1,dim))
-                optical = np.reshape(opticals[f], (1, dimension))
-                angle = np.reshape(angles[f], (1, dimension))
-                final_data.append(np.hstack((h, optical, angle)))
+            for f in range(len(frames)):
+
+                hog = self.hog(frames[f])
+                hog = np.reshape(hog, (1, len(hog)))
+                hog = 100 * (hog - hog.mean()) / hog.std()
+
+                optical = self.hog(opticals[f])
+                optical = np.reshape(optical, (1, len(optical)))
+                optical = 100*(optical - optical.mean())/optical.std()
+
+                angle = self.hog(angles[f])
+                angle = np.reshape(angle, (1, len(angle)))
+                optical = 100 * (angle - angle.mean()) / angle.std()
+
+                vector = np.int16(np.hstack((hog, optical, angle)))
+
+                if count == 1 and f == 0:
+                    final_data = vector
+                else:
+                    final_data = np.vstack((final_data, vector))
+
+                # final_data.append(preprocessing.StandardScaler().fit(vector).transform(vector))
 
         final_data = np.vstack(final_data)
 
@@ -173,3 +189,24 @@ class MachineLearning:
     #     HOG = ndi_sum(magnit[..., 0], labels, index)
     #
     #     return HOG / img_area
+
+    def hog(self, img):
+
+        gx = cv2.Sobel(img, cv2.CV_32F, 1, 0)
+        gy = cv2.Sobel(img, cv2.CV_32F, 0, 1)
+        mag, ang = cv2.cartToPolar(gx, gy)
+
+        # quantizing binvalues in (0...16)
+        bins = np.int32(16 * ang / (2 * np.pi))
+
+        # Divide to 4 sub-squares
+        bin_cells = bins[:10, :10], bins[10:, :10], bins[:10, 10:], bins[10:, 10:]
+        mag_cells = mag[:10, :10], mag[10:, :10], mag[:10, 10:], mag[10:, 10:]
+        hists = [np.bincount(b.ravel(), m.ravel(), 16) for b, m in zip(bin_cells, mag_cells)]
+        hist = np.hstack(hists)
+        return hist
+
+    def show_frame(self, frame):
+        cv2.imshow('image', frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
