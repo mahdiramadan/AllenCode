@@ -21,12 +21,10 @@ from sklearn.metrics import classification_report
 from sklearn.svm import SVC
 from sklearn import preprocessing
 from sklearn.externals import joblib
-from sklearn.ensemble import RandomForestClassifier
-from itertools import product
-from math import floor, pi
-from scipy.ndimage.measurements import sum as ndi_sum
 import time
-from sklearn.decomposition import PCA, IncrementalPCA
+import math
+from skimage import feature
+from scipy import ndimage
 
 class MachineLearning:
     def __init__(self, exp_folder, lims_ID):
@@ -39,56 +37,58 @@ class MachineLearning:
         input = self.get_data()
 
         X_train = input['feature_data'][0:8000]
-        X_test = input['feature_data'][8000:10000]
+        X_test = input['feature_data'][8000:12000]
 
-        y_train = np.reshape(input['label'][0:8000], (8000, 1))
-        y_test = np.reshape(input['label'][8000:10000], (2000,1))
+        y_train = input['label'][0:8000]
+        y_test = input['label'][8000:12000]
 
 
-        # # Set the parameters by cross-validation
-        # tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-5],
-        #                      'C': [0.1, 1, 10, 100, 1000]},
-        #                     {'kernel': ['linear'], 'C': [0.1, 1, 10, 100, 1000]}]
+        # Set the parameters by cross-validation
+        tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-5],
+                             'C': [0.1, 1, 10, 100, 1000]},
+                            {'kernel': ['linear'], 'C': [0.1, 1, 10, 100, 1000]}]
+
+        scores = ['accuracy', 'f1']
+
+        for score in scores:
+            print("# Tuning hyper-parameters for %s" % score)
+            print()
+
+            clf = GridSearchCV(SVC(C=1), tuned_parameters, cv=5,
+                               scoring='%s' % score)
+            clf.fit(X_train, y_train)
+
+            print("Best parameters set found on development set:")
+            print()
+            print(clf.best_params_)
+            print()
+            print("Grid scores on development set:")
+            print()
+            for params, mean_score, scores in clf.grid_scores_:
+                print("%0.3f (+/-%0.03f) for %r"
+                      % (mean_score, scores.std() * 2, params))
+            print()
+
+            print("Detailed classification report:")
+            print()
+            print("The model is trained on the full development set.")
+            print("The scores are computed on the full evaluation set.")
+            print()
+            y_true, y_pred = y_test, clf.predict(X_test)
+            print(classification_report(y_true, y_pred))
+            print()
+
+        # # clf = RandomForestClassifier(verbose=3)
+        # clf = SVC(kernel='linear', C = 0.1, verbose = 2)
         #
-        # scores = ['precision', 'recall']
+        # clf.fit(X_train, y_train)
         #
-        # for score in scores:
-        #     print("# Tuning hyper-parameters for %s" % score)
-        #     print()
+        # joblib.dump(clf, 'clf.pkl')
         #
-        #     clf = GridSearchCV(SVC(C=1), tuned_parameters, cv=4,
-        #                        scoring='%s_weighted' % score)
-        #     clf.fit(X_train, y_train)
+        # y_true, y_pred = y_test, clf.predict(X_test)
+        # print(classification_report(y_true, y_pred))
         #
-        #     print("Best parameters set found on development set:")
-        #     print()
-        #     print(clf.best_params_)
-        #     print()
-        #     print("Grid scores on development set:")
-        #     print()
-        #     for params, mean_score, scores in clf.grid_scores_:
-        #         print("%0.3f (+/-%0.03f) for %r"
-        #               % (mean_score, scores.std() * 2, params))
-        #     print()
-        #
-        #     print("Detailed classification report:")
-        #     print()
-        #     print("The model is trained on the full development set.")
-        #     print("The scores are computed on the full evaluation set.")
-        #     print()
-        #     y_true, y_pred = y_test, clf.predict(X_test)
-        #     print(classification_report(y_true, y_pred))
-        #     print()
-
-        clf = RandomForestClassifier(verbose=3)
-        clf.fit(X_train, y_train)
-
-        joblib.dump(clf, 'clf.pkl')
-
-        y_true, y_pred = y_test, clf.predict(X_test)
-        print(classification_report(y_true, y_pred))
-
-        # clf = joblib.load('filename.pk1')
+        # # clf = joblib.load('filename.pk1')
 
     def get_data(self):
 
@@ -99,7 +99,7 @@ class MachineLearning:
         # wheel = preprocessing.StandardScaler().fit(wheel).transform(wheel)
         count = 0
 
-        for item in range(1, 11):
+        for item in range(1, 13):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
@@ -114,15 +114,15 @@ class MachineLearning:
 
                 hog = self.hog(frames[f])
                 hog = np.reshape(hog, (1, len(hog)))
-                hog = 100 * (hog - hog.mean()) / hog.std()
+                hog = (hog - hog.min())/(hog.max() - hog.min() + 10**-10)
 
                 optical = self.hog(opticals[f])
                 optical = np.reshape(optical, (1, len(optical)))
-                optical = 100*(optical - optical.mean())/optical.std()
+                optical = (optical - optical.min()) / (optical.max() - optical.min() + 10**-10)
 
                 angle = self.hog(angles[f])
                 angle = np.reshape(angle, (1, len(angle)))
-                optical = 100 * (angle - angle.mean()) / angle.std()
+                angle = (angle - angle.min()) / (angle.max() - angle.min()+ 10**-10)
 
                 vector = np.int16(np.hstack((hog, optical, angle)))
 
@@ -130,6 +130,7 @@ class MachineLearning:
                     final_data = vector
                 else:
                     final_data = np.vstack((final_data, vector))
+
 
                 # final_data.append(preprocessing.StandardScaler().fit(vector).transform(vector))
 
@@ -210,3 +211,161 @@ class MachineLearning:
         cv2.imshow('image', frame)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+
+    def get_features(self, image, bins=8, angle=360., pyramid_levels=3):
+        """
+        Returns a feature vector containing a PHOG descriptor of a whole image.
+
+        :param image_path: Absolute path to an image
+        :param bins: Number of (orientation) bins on the histogram (optimal: 20)
+        :param angle: 180 or 360 (optimal: 360)
+        :param pyramid_levels: Number of pyramid levels (optimal: 3)
+        :return:
+        """
+
+        feature_vec = self.phog(image, bins, angle, pyramid_levels)
+        feature_vec = feature_vec.T[0]  # Transpose vector, take the first array
+        return feature_vec
+
+    def phog(self, image, bin, angle, pyramid_levels):
+        """
+        Given and image I, phog computes the Pyramid Histogram of Oriented
+        Gradients over L pyramid levels and over a Region Of Interest.
+
+        :param image_path: Absolute path to an image of size MxN (Color or Gray)
+        :param bin: Number of (orientation) bins on the histogram
+        :param angle: 180 or 360
+        :param pyramid_levels: Number of pyramid levels
+        :return: Pyramid histogram of oriented gradients
+        """
+
+        grayscale_img = image  # 0 converts it to grayscale
+        x = image.shape[0]
+        y= image.shape[1]
+
+        bh = np.array([])
+        bv = np.array([])
+        if np.sum(np.sum(grayscale_img)) > 100.:
+            # Matlab The default sigma is sqrt(2); the size of the filter is chosen automatically, based on sigma.
+            # Threshold is applied automatically - the percentage is a bit different than in Matlab's implementation:
+            # low_threshold: 10%
+            # high_threshold: 20%
+            edges_canny = feature.canny(grayscale_img, sigma=math.sqrt(2))
+            [GradientY, GradientX] = np.gradient(np.double(grayscale_img))
+            GradientYY = np.gradient(GradientY)[1]  # Take only the first matrix
+            Gr = np.sqrt((GradientX * GradientX + GradientY * GradientY))
+
+            index = GradientX == 0.
+            index = np.int16(index)  # Convert boolean array to an int array
+            GradientX[np.where(index > 0)] = np.power(10, -5)
+            YX = GradientY / GradientX
+
+            if angle == 180.:
+                angle_values = np.divide((np.arctan(YX) + np.pi / 2.) * 180., np.pi)
+            if angle == 360:
+                angle_values = np.divide((np.arctan2(GradientY, GradientX) + np.pi) * 180., np.pi)
+
+            [bh, bv] = self.bin_matrix(angle_values, edges_canny, Gr, angle, bin)
+        else:
+            bh = np.zeros((x,y))
+            bv = np.zeros((x,y))
+
+        # Don't consider a roi, take the whole image instead
+        bh_roi = bh
+        bv_roi = bv
+        p = self.phog_descriptor(bh_roi, bv_roi, pyramid_levels, bin)
+
+        return p
+
+    def bin_matrix(self, angle_values, edge_image, gradient_values, angle, bin):
+        """
+        Computes a Matrix (bm) with the same size of the image where
+        (i,j) position contains the histogram value for the pixel at position (i,j)
+        and another matrix (bv) where the position (i,j) contains the gradient
+        value for the pixel at position (i,j)
+
+        :param angle_values: Matrix containing the angle values
+        :param edge_image: Edge Image
+        :param gradient_values: Matrix containing the gradient values
+        :param angle: 180 or 360
+        :param bin: Number of bins on the histogram
+        :return: bm - Matrix with the histogram values
+                bv - Matrix with the gradient values (only for the pixels belonging to and edge)
+        """
+
+        # 8-orientations/connectivity structure (Matlab's default is 8 for bwlabel)
+        structure_8 = [[1, 1, 1],
+                       [1, 1, 1],
+                       [1, 1, 1]]
+
+        [contorns, n] = ndimage.label(edge_image, structure_8)
+        X = edge_image.shape[1]
+        Y = edge_image.shape[0]
+        bm = np.zeros((Y, X))
+        bv = np.zeros((Y, X))
+        nAngle = np.divide(angle, bin)
+        for i in np.arange(1, n + 1):
+            [posY, posX] = np.nonzero(contorns == i)
+            posY = posY + 1
+            posX = posX + 1
+            for j in np.arange(1, (posY.shape[0]) + 1):
+                pos_x = posX[int(j) - 1]
+                pos_y = posY[int(j) - 1]
+                b = np.ceil(np.divide(angle_values[int(pos_y) - 1, int(pos_x) - 1], nAngle))
+                if b == 0.:
+                    bin = 1.
+                if gradient_values[int(pos_y) - 1, int(pos_x) - 1] > 0:
+                    bm[int(pos_y) - 1, int(pos_x) - 1] = b
+                    bv[int(pos_y) - 1, int(pos_x) - 1] = gradient_values[int(pos_y) - 1, int(pos_x) - 1]
+
+        return [bm, bv]
+
+    def phog_descriptor(self, bh, bv, pyramid_levels, bin):
+        """
+        Computes Pyramid Histogram of Oriented Gradient over an image.
+
+        :param bh: Matrix of bin histogram values
+        :param bv: Matrix of gradient values
+        :param pyramid_levels: Number of pyramid levels
+        :param bin: Number of bins
+        :return: Pyramid histogram of oriented gradients (phog descriptor)
+        """
+
+        p = np.empty((0, 1), dtype=int)  # dtype=np.float64? # vertical size 0, horizontal 1
+
+        for b in np.arange(1, bin + 1):
+            ind = bh == b
+            ind = np.int16(ind)  # convert boolean array to int array
+            sum_ind = np.sum(bv[np.where(ind > 0)])
+            p = np.append(p, np.array([[sum_ind]]), axis=0)  # append the sum horizontally to empty p array
+
+        cella = 1.
+        for l in np.arange(1, pyramid_levels + 1):  # defines a range (from, to, step)
+            x = np.fix(np.divide(bh.shape[1], 2. ** l))
+            y = np.fix(np.divide(bh.shape[0], 2. ** l))
+            xx = 0.
+            yy = 0.
+            while xx + x <= bh.shape[1]:
+                while yy + y <= bh.shape[0]:
+                    bh_cella = np.array([])
+                    bv_cella = np.array([])
+                    bh_cella = bh[int(yy + 1.) - 1:yy + y, int(xx + 1.) - 1:xx + x]
+                    bv_cella = bv[int(yy + 1.) - 1:yy + y, int(xx + 1.) - 1:xx + x]
+
+                    for b in np.arange(1, bin + 1):
+                        ind = bh_cella == b
+                        ind = np.int16(ind) # convert boolean array to int array
+                        sum_ind = np.sum(bv_cella[np.where(ind > 0)])
+                        p = np.append(p, np.array([[sum_ind]]), axis=0)  # append the sum horizontally to p
+
+                    yy = yy + y
+
+                cella = cella + 1.
+                yy = 0.
+                xx = xx + x
+
+        if np.sum(p) != 0:
+            p = np.divide(p, np.sum(p))
+
+        return p
