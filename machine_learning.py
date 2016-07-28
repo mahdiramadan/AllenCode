@@ -121,6 +121,7 @@ class MachineLearning:
         index = self.ep.get_labels().index(label) + 1
         running = np.array(self.ep.get_per_frame_data()[index])
 
+
         for item in range(1,21):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
@@ -135,6 +136,9 @@ class MachineLearning:
             height = len(frames[0])
             dim = height / 2 * (width / 2)
 
+            hsv = np.zeros((260,540,3))
+            hsv[..., 1] = 255
+
             for f in range(len(frames)):
 
 
@@ -144,18 +148,49 @@ class MachineLearning:
                 # hog = (hog - hog.min())/(hog.max() - hog.min() + 10**-1)
 
 
-                section_1 = frames[f][0:height/2, 0: width/2]
-                section_2 = frames[f][height/2: height, 0: width/2]
-                section_3 = angles[f][0:height / 2, width/ 2:width]
+                # section_1 = frames[f][height/4: 2*height/3 , 0: width/2]
+                # self.show_frame(section_1)
+
+                section_2 = frames[f][height/4: 2*height/3, 0: width/2]
+                height2 = len(section_2)
+                width2 = len(section_2[0])
+                section_2 = np.reshape(section_2, (1, height2 * width2))
+
+
+                section_3 = frames[f][0:height / 2, width/ 2:width]
+
+                height3 = len(section_3)
+                width3 = len(section_3[0])
+                section_3 = np.reshape(section_3, (1, height3*width3))
+
+
                 section_4 = frames[f][height/2:height, width/2: width]
+
+                height4 = len(section_4)
+                width4 = len(section_4[0])
+                section_4 = np.reshape(section_4, (1, height4 * width4))
+
                 #
                 # optical_1 = self.hog(section_1)
                 # optical_2 = self.hog(section_2)
                 # optical_3 = self.hog(section_3)
                 # optical_4 = self.hog(section_4)
 
+                hsv[...,0] = angles[f]
+                hsv[..., 2] = cv2.normalize(opticals[f], None, 0, 255, cv2.NORM_MINMAX)
+                hsv= np.float32(hsv)
+                rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
+
+                x = rgb[:,:,0]
+                x = x[np.nonzero(x)]
+
+                y = rgb[:,:,1]
+                # y = y[np.nonzero(y)]
+
+                z = rgb[:,:,2]
+                z = z[np.nonzero(z)]
 
 
                 # hist_1, bin_1 = np.histogram(np.reshape((opticals[f][height / 2: height, 0: width / 2]), (1, dim)), 20)
@@ -186,26 +221,31 @@ class MachineLearning:
                 #
                 # vector = np.int16(np.hstack(( optical, angle)))
                 #
-                if running[k] == 1:
+                k += 1
+
+                if walking[k] == 1:
                     first += 1
+                    h, b = np.histogram(section_2, density=True)
+                    vv = np.multiply(h, b[:-1])
                     if first == 1:
                         hist_1 = wheel[k]
-                        hist_2 = stats.mode(section_4, axis = None)[0]
+                        # hist_2 = stats.mode(section_3, axis = None)[0]
+                        hist_2 = y.mean()
                     else:
                         hist_1 = np.hstack((hist_1, wheel[k]))
-                        hist_2 = np.hstack((hist_2, stats.mode(section_4, axis = None)[0]))
+                        hist_2 = np.hstack((hist_2,y.mean()))
 
                 if labeled_vector[k] == 1:
-
+                    h, b = np.histogram(section_2, density=True)
+                    vv = np.multiply(h , b[:-1])
                     second += 1
                     if second == 1:
                         hist_0 = wheel[k]
-                        hist_3 = stats.mode(section_4, axis = None )[0]
+                        hist_3 = y.mean()
                     else:
-                        hist_0 = np.hstack((hist_0, wheel[k]))
-                        hist_3 = np.hstack((hist_3,stats.mode(section_4, axis = None)[0]))
+                        hist_0 = np.hstack((hist_0, wheel[f]))
+                        hist_3 = np.hstack((hist_3,y.mean()))
 
-                k +=1
 
 
 
