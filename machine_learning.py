@@ -25,6 +25,9 @@ import time
 import math
 from skimage import feature
 from scipy import ndimage
+from sklearn import neighbors, datasets
+from scipy import stats
+
 
 class MachineLearning:
     def __init__(self, exp_folder, lims_ID):
@@ -36,58 +39,59 @@ class MachineLearning:
 
         input = self.get_data()
 
-        X_train = input['feature_data'][0:8000]
-        X_test = input['feature_data'][8000:12000]
-
-        y_train = input['label'][0:8000]
-        y_test = input['label'][8000:12000]
-
-
-        # Set the parameters by cross-validation
-        tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-5],
-                             'C': [0.1, 1, 10, 100, 1000]},
-                            {'kernel': ['linear'], 'C': [0.1, 1, 10, 100, 1000]}]
-
-        scores = ['accuracy', 'f1']
-
-        for score in scores:
-            print("# Tuning hyper-parameters for %s" % score)
-            print()
-
-            clf = GridSearchCV(SVC(C=1), tuned_parameters, cv=5,
-                               scoring='%s' % score)
-            clf.fit(X_train, y_train)
-
-            print("Best parameters set found on development set:")
-            print()
-            print(clf.best_params_)
-            print()
-            print("Grid scores on development set:")
-            print()
-            for params, mean_score, scores in clf.grid_scores_:
-                print("%0.3f (+/-%0.03f) for %r"
-                      % (mean_score, scores.std() * 2, params))
-            print()
-
-            print("Detailed classification report:")
-            print()
-            print("The model is trained on the full development set.")
-            print("The scores are computed on the full evaluation set.")
-            print()
-            y_true, y_pred = y_test, clf.predict(X_test)
-            print(classification_report(y_true, y_pred))
-            print()
-
-        # # clf = RandomForestClassifier(verbose=3)
-        # clf = SVC(kernel='linear', C = 0.1, verbose = 2)
+        # X_train = input['feature_data'][0:8000]
+        # X_test = input['feature_data'][8000:12000]
         #
+        # y_train = input['label'][0:8000]
+        # y_test = input['label'][8000:12000]
+        #
+        #
+        # # # Set the parameters by cross-validation
+        # # tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-5],
+        # #                      'C': [0.1, 1, 10, 100, 1000]},
+        # #                     {'kernel': ['linear'], 'C': [0.1, 1, 10, 100, 1000]}]
+        # #
+        # # scores = ['accuracy', 'f1']
+        # #
+        # # for score in scores:
+        # #     print("# Tuning hyper-parameters for %s" % score)
+        # #     print()
+        # #
+        # #     clf = GridSearchCV(SVC(C=1), tuned_parameters, cv=5,
+        # #                        scoring='%s' % score)
+        # #     clf.fit(X_train, y_train)
+        # #
+        # #     print("Best parameters set found on development set:")
+        # #     print()
+        # #     print(clf.best_params_)
+        # #     print()
+        # #     print("Grid scores on development set:")
+        # #     print()
+        # #     for params, mean_score, scores in clf.grid_scores_:
+        # #         print("%0.3f (+/-%0.03f) for %r"
+        # #               % (mean_score, scores.std() * 2, params))
+        # #     print()
+        # #
+        # #     print("Detailed classification report:")
+        # #     print()
+        # #     print("The model is trained on the full development set.")
+        # #     print("The scores are computed on the full evaluation set.")
+        # #     print()
+        # #     y_true, y_pred = y_test, clf.predict(X_test)
+        # #     print(classification_report(y_true, y_pred))
+        # #     print()
+        #
+        # # # clf = RandomForestClassifier(verbose=3)
+        # # clf = SVC(kernel='linear', C = 0.1, verbose = 2)
+        #
+        # clf = neighbors.KNeighborsClassifier(2)
         # clf.fit(X_train, y_train)
         #
         # joblib.dump(clf, 'clf.pkl')
         #
         # y_true, y_pred = y_test, clf.predict(X_test)
         # print(classification_report(y_true, y_pred))
-        #
+
         # # clf = joblib.load('filename.pk1')
 
     def get_data(self):
@@ -98,8 +102,26 @@ class MachineLearning:
         wheel = pickle.load(open('wheel.pickle', 'rb'))
         # wheel = preprocessing.StandardScaler().fit(wheel).transform(wheel)
         count = 0
+        k = 0
+        first = 0
+        second = 0
+        hist_1 = []
+        hist_0 = []
+        hist_2 = []
+        hist_3 = []
+        label = 'fidget'
+        index = self.ep.get_labels().index(label) + 1
+        labeled_vector = np.array(self.ep.get_per_frame_data()[index])
 
-        for item in range(1, 13):
+        label = 'walking'
+        index = self.ep.get_labels().index(label) + 1
+        walking = np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'running'
+        index = self.ep.get_labels().index(label) + 1
+        running = np.array(self.ep.get_per_frame_data()[index])
+
+        for item in range(1,21):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
@@ -109,36 +131,113 @@ class MachineLearning:
             count += 1
             print ('first ' + str(count) + '000 frames')
 
+            width = len(frames[0][0])
+            height = len(frames[0])
+            dim = height / 2 * (width / 2)
 
             for f in range(len(frames)):
 
-                hog = self.hog(frames[f])
-                hog = np.reshape(hog, (1, len(hog)))
-                hog = (hog - hog.min())/(hog.max() - hog.min() + 10**-10)
 
-                optical = self.hog(opticals[f])
-                optical = np.reshape(optical, (1, len(optical)))
-                optical = (optical - optical.min()) / (optical.max() - optical.min() + 10**-10)
+                # hog = self.hog(frames[f])
+                # hog =
+                #  np.reshape(hog, (1, len(hog)))
+                # hog = (hog - hog.min())/(hog.max() - hog.min() + 10**-1)
 
-                angle = self.hog(angles[f])
-                angle = np.reshape(angle, (1, len(angle)))
-                angle = (angle - angle.min()) / (angle.max() - angle.min()+ 10**-10)
 
-                vector = np.int16(np.hstack((hog, optical, angle)))
+                section_1 = frames[f][0:height/2, 0: width/2]
+                section_2 = frames[f][height/2: height, 0: width/2]
+                section_3 = angles[f][0:height / 2, width/ 2:width]
+                section_4 = frames[f][height/2:height, width/2: width]
+                #
+                # optical_1 = self.hog(section_1)
+                # optical_2 = self.hog(section_2)
+                # optical_3 = self.hog(section_3)
+                # optical_4 = self.hog(section_4)
 
-                if count == 1 and f == 0:
-                    final_data = vector
-                else:
-                    final_data = np.vstack((final_data, vector))
+
+
+
+
+                # hist_1, bin_1 = np.histogram(np.reshape((opticals[f][height / 2: height, 0: width / 2]), (1, dim)), 20)
+                # b_width = 0.7 * (bin_1[1] - bin_1[0])
+                # center = (bin_1[:-1] + bin_1[1:]) / 2
+                # plt.bar(center, hist_1, align='center', width=b_width)
+                # plt.show()
+                #
+                # hist_1, bin_1 = np.histogram(np.reshape((opticals[f][0:height / 2, width / 2:width]), (1, dim)), 20)
+                # b_width = 0.7 * (bin_1[1] - bin_1[0])
+                # center = (bin_1[:-1] + bin_1[1:]) / 2
+                # plt.bar(center, hist_1, align='center', width= b_width)
+                # plt.show()
+                #
+                # hist_1, bin_1 = np.histogram(np.reshape((opticals[f][height / 2:height, width / 2: width]), (1, dim)), 20)
+                # b_width = 0.7 * (bin_1[1] - bin_1[0])
+                # center = (bin_1[:-1] + bin_1[1:]) / 2
+                # plt.bar(center, hist_1, align='center', width= b_width)
+                # plt.show()
+                #
+                #
+                # optical = np.reshape(optical, (1, len(optical)))
+                # optical = (optical - optical.min()) / (optical.max() - optical.min() + 10**-10)
+                #
+                # angle = self.hog(angles[f])
+                # angle = np.reshape(angle, (1, len(angle)))
+                # angle = (angle - angle.min()) / (angle.max() - angle.min()+ 10**-10)
+                #
+                # vector = np.int16(np.hstack(( optical, angle)))
+                #
+                if running[k] == 1:
+                    first += 1
+                    if first == 1:
+                        hist_1 = wheel[k]
+                        hist_2 = stats.mode(section_4, axis = None)[0]
+                    else:
+                        hist_1 = np.hstack((hist_1, wheel[k]))
+                        hist_2 = np.hstack((hist_2, stats.mode(section_4, axis = None)[0]))
+
+                if labeled_vector[k] == 1:
+
+                    second += 1
+                    if second == 1:
+                        hist_0 = wheel[k]
+                        hist_3 = stats.mode(section_4, axis = None )[0]
+                    else:
+                        hist_0 = np.hstack((hist_0, wheel[k]))
+                        hist_3 = np.hstack((hist_3,stats.mode(section_4, axis = None)[0]))
+
+                k +=1
+
 
 
                 # final_data.append(preprocessing.StandardScaler().fit(vector).transform(vector))
 
-        final_data = np.vstack(final_data)
+        x = np.mean(hist_1)
+        y = np.std(hist_1)
+        z = np.max(hist_1)
+        print(x,y,z)
 
-        label = 'fidget'
-        index = self.ep.get_labels().index(label) + 1
-        labeled_vector = np.array(self.ep.get_per_frame_data()[index])
+        fig = plt.figure(1)
+        ax = fig.add_subplot(111)
+        # hist_1, bin_1 = np.histogram(hist_1, 20, normed= True)
+        # b_width = 0.7 * (bin_1[1] - bin_1[0])
+        # center = (bin_1[:-1] + bin_1[1:]) / 2
+        ax.plot(hist_1,hist_2, 'go' )
+
+
+        x = np.mean(hist_0)
+        y = np.std(hist_0)
+        z = np.max(hist_0)
+
+        print(x, y, z)
+
+        # hist_0, bin_0 = np.histogram(hist_0, 20, normed= True)
+        # b_width = 0.7 * (bin_1[1] - bin_1[0])
+        # center = (bin_1[:-1] + bin_1[1:]) / 2
+        ax1 = fig.add_subplot(111)
+        ax1.plot(hist_0, hist_3, 'ro')
+        plt.show()
+
+
 
         return {'feature_data': final_data, 'label': labeled_vector}
 
@@ -196,16 +295,7 @@ class MachineLearning:
         gx = cv2.Sobel(img, cv2.CV_32F, 1, 0)
         gy = cv2.Sobel(img, cv2.CV_32F, 0, 1)
         mag, ang = cv2.cartToPolar(gx, gy)
-
-        # quantizing binvalues in (0...16)
-        bins = np.int32(16 * ang / (2 * np.pi))
-
-        # Divide to 4 sub-squares
-        bin_cells = bins[:10, :10], bins[10:, :10], bins[:10, 10:], bins[10:, 10:]
-        mag_cells = mag[:10, :10], mag[10:, :10], mag[:10, 10:], mag[10:, 10:]
-        hists = [np.bincount(b.ravel(), m.ravel(), 16) for b, m in zip(bin_cells, mag_cells)]
-        hist = np.hstack(hists)
-        return hist
+        return mag
 
     def show_frame(self, frame):
         cv2.imshow('image', frame)
