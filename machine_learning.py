@@ -37,12 +37,45 @@ class MachineLearning:
 
         input = self.get_data()
 
-        # X_train = input['feature_data'][0:8000]
-        # X_test = input['feature_data'][8000:12000]
-        #
-        # y_train = input['label'][0:8000]
-        # y_test = input['label'][8000:12000]
-        #
+        X_train = input['feature_data'][0:8000]
+        X_test = input['feature_data'][8000:12000]
+
+        label = 'fidget'
+        index = self.ep.get_labels().index(label) + 1
+        fidget_vector = np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'walking'
+        index = self.ep.get_labels().index(label) + 1
+        walking= np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'running'
+        index = self.ep.get_labels().index(label) + 1
+        running = np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'chattering'
+        index = self.ep.get_labels().index(label) + 1
+        chattering = np.array(self.ep.get_per_frame_data()[index])
+
+        movement_vector = []
+
+        movement_vector.append([sum(x) for x in zip(walking, running)])
+
+        none_vector = np.ones((1, len(fidget_vector)))
+
+        for i in range(len(fidget_vector)):
+            if movement_vector[0][i] == 1 or chattering[i] == 1 or fidget_vector[i] == 1:
+                none_vector[0][i] = 0
+
+        y_train_fidget = fidget_vector
+        y_train_movement = movement_vector[0]
+        y_train_grooming = chattering
+        y_train_none = none_vector[0]
+
+        y_test_fidget = fidget_vector
+        y_test_movement = movement_vector[0]
+        y_test_grooming = chattering
+        y_test_none = none_vector[0]
+
         #
         # # # Set the parameters by cross-validation
         # # tuned_parameters = [{'kernel': ['rbf'], 'gamma': [10, 1, 1e-3, 1e-4],
@@ -103,15 +136,9 @@ class MachineLearning:
 
         count = 0
         k = 0
-        first = 0
-        second = 0
-        hist_1 = []
-        hist_2 = []
-        hist_3 = []
-        hist_4 = []
-        hist_5 = []
-        hist_6 = []
 
+        hsv = np.zeros((260, 540, 3))
+        hsv[..., 1] = 255
 
         # label = 'fidget'
         # index = self.ep.get_labels().index(label) + 1
@@ -139,9 +166,6 @@ class MachineLearning:
             # width = len(frames[0][0])
             # height = len(frames[0])
             # dim = height / 2 * (width / 2)
-
-            hsv = np.zeros((260,540,3))
-            hsv[..., 1] = 255
 
             for f in range(len(frames)):
 
@@ -191,8 +215,8 @@ class MachineLearning:
                 #
                 # vector = np.int16(np.hstack(( optical, angle)))
 
-                hsv[..., 0] = angles[f]
-                hsv[..., 2] = cv2.normalize(opticals[f], None, 0, 255, cv2.NORM_MINMAX)
+                hsv[..., 0] = angles[k]
+                hsv[..., 2] = cv2.normalize(opticals[k], None, 0, 255, cv2.NORM_MINMAX)
                 hsv = np.float32(hsv)
                 rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
@@ -208,45 +232,49 @@ class MachineLearning:
                 optic2 = []
                 optic3= []
 
-                # for (x,y,window) in self.sliding_window(frames[f], 60, (60,60)):
-                #     yy = np.bincount(np.squeeze(np.reshape(window, (1, 3600))))
-                #     ii = np.nonzero(yy)[0]
-                #     hist_x = np.multiply(ii, yy[ii])
-                #     frame_data = np.concatenate((frame_data, hist_x))
-
-                for (x, y, window) in self.sliding_window(r, 60, (60, 60)):
-                    hist, bin = np.histogram(r, 20)
+                for (x,y,window) in self.sliding_window(frames[k][0:240, :], 60, (60,60)):
+                    hist, bin = np.histogram(window, 10)
                     center = (bin[:-1] + bin[1:]) / 2
-                    yy = np.bincount(np.squeeze(np.reshape(window, (1, 3600))))
-                    ii = np.nonzero(yy)[0]
-                    hist_x = np.multiply(ii, yy[ii])
+                    hist_x = np.multiply(center, hist)
+                    hist_x = (hist_x- np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                    frame_data = np.concatenate((frame_data, hist_x))
+
+                for (x, y, window) in self.sliding_window(r[0:240, :], 60, (60, 60)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
                     optic1 = np.concatenate((optic1, hist_x))
 
-                for (x, y, window) in self.sliding_window(b, 60, (60, 60)):
-                    yy = np.bincount(np.squeeze(np.reshape(window, (1, 3600))))
-                    ii = np.nonzero(yy)[0]
-                    hist_x = np.multiply(ii, yy[ii])
+                for (x, y, window) in self.sliding_window(b[0:240, :], 60, (60, 60)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
                     optic2 = np.concatenate((optic2, hist_x))
 
-                for (x, y, window) in self.sliding_window(g, 60, (60, 60)):
-
-                    yy = np.bincount(np.squeeze(np.reshape(window, (1, 3600))))
-                    ii = np.nonzero(yy)[0]
-                    hist_x = np.multiply(ii, yy[ii])
+                for (x, y, window) in self.sliding_window(g[0:240, :], 60, (60, 60)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
                     optic3 = np.concatenate((optic3, hist_x))
 
+
                 if count == 1:
-                    final_data = np.concatenate((frame_data, optic1, optic2, optic3))
+                    final_data = np.concatenate((np.reshape(wheel[k], (1,)),frame_data, optic1, optic2, optic3))
 
                 else:
-                    vector = np.concatenate((frame_data, optic1, optic2, optic3))
+                    vector = np.concatenate((np.reshape(wheel[k], (1,)), frame_data, optic1, optic2, optic3))
+
+                k += 1
 
 
             final_data = np.vstack((final_data, vector))
 
 
 
-        return {'feature_data': final_data, 'label': labeled_vector}
+        return {'feature_data': final_data}
 
     def hog(self, img):
 
@@ -262,8 +290,8 @@ class MachineLearning:
 
     def sliding_window(self, image, stepSize, windowSize):
         # slide a window across the image
-        for y in xrange(0, image.shape[0] - stepSize, stepSize):
-            for x in xrange(0, image.shape[1]- stepSize, stepSize):
+        for y in xrange(0, image.shape[0], stepSize):
+            for x in xrange(0, image.shape[1], stepSize):
                 # yield the current window
                 yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
 
