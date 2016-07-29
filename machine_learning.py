@@ -40,25 +40,6 @@ class MachineLearning:
         X_train = input['feature_data'][0:8000]
         X_test = input['feature_data'][8000:12000]
 
-        label = 'fidget'
-        index = self.ep.get_labels().index(label) + 1
-        fidget_vector = np.array(self.ep.get_per_frame_data()[index])
-
-        label = 'walking'
-        index = self.ep.get_labels().index(label) + 1
-        walking= np.array(self.ep.get_per_frame_data()[index])
-
-        label = 'running'
-        index = self.ep.get_labels().index(label) + 1
-        running = np.array(self.ep.get_per_frame_data()[index])
-
-        label = 'chattering'
-        index = self.ep.get_labels().index(label) + 1
-        chattering = np.array(self.ep.get_per_frame_data()[index])
-
-        movement_vector = []
-
-        movement_vector.append([sum(x) for x in zip(walking, running)])
 
         none_vector = np.ones((1, len(fidget_vector)))
 
@@ -129,28 +110,34 @@ class MachineLearning:
 
         hf = h5py.File('data.h5', 'r')
         final_data = []
+        y_train = []
         dimension = 260*540
         wheel = pickle.load(open('wheel.pickle', 'rb'))
         wheel = (wheel - np.min(wheel)) / (np.max(wheel) - np.min(wheel) + 10 ** -10)
 
+        label = 'fidget'
+        index = self.ep.get_labels().index(label) + 1
+        fidget_vector = np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'walking'
+        index = self.ep.get_labels().index(label) + 1
+        walking = np.array(self.ep.get_per_frame_data()[index])
+
+        label = 'running'
+        index = self.ep.get_labels().index(label) + 1
+        running = np.array(self.ep.get_per_frame_data()[index])
+
+        movement_vector = []
+        movement_vector.append([sum(x) for x in zip(walking, running)])
+
 
         count = 0
         k = 0
+        t= 0
 
         hsv = np.zeros((260, 540, 3))
         hsv[..., 1] = 255
 
-        # label = 'fidget'
-        # index = self.ep.get_labels().index(label) + 1
-        # labeled_vector = np.array(self.ep.get_per_frame_data()[index])
-        #
-        # label = 'walking'
-        # index = self.ep.get_labels().index(label) + 1
-        # walking= np.array(self.ep.get_per_frame_data()[index])
-        #
-        # label = 'running'
-        # index = self.ep.get_labels().index(label) + 1
-        # running = np.array(self.ep.get_per_frame_data()[index])
 
         for item in range(1, 2):
             group = hf.get('first ' + str(item) + '000 frames')
@@ -167,7 +154,7 @@ class MachineLearning:
             # height = len(frames[0])
             # dim = height / 2 * (width / 2)
 
-            for f in range(len(frames)):
+            for f in range(520,525):
 
 
                 # hog = self.hog(frames[f])
@@ -215,66 +202,71 @@ class MachineLearning:
                 #
                 # vector = np.int16(np.hstack(( optical, angle)))
 
-                hsv[..., 0] = angles[k]
-                hsv[..., 2] = cv2.normalize(opticals[k], None, 0, 255, cv2.NORM_MINMAX)
-                hsv = np.float32(hsv)
-                rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+                if fidget_vector[k] == 1 or movement_vector[0][k] == 1:
+                    hsv[..., 0] = angles[k]
+                    hsv[..., 2] = cv2.normalize(opticals[k], None, 0, 255, cv2.NORM_MINMAX)
+                    hsv = np.float32(hsv)
+                    rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-                r = np.int64(rgb[:,:,0])
-                # x = x[np.nonzero(x)]
-                b = np.int64(rgb[:,:,1])
-                g = np.int64(rgb[:,:,2])
+                    r = np.int64(rgb[:,:,0])
+                    # x = x[np.nonzero(x)]
+                    b = np.int64(rgb[:,:,1])
+                    g = np.int64(rgb[:,:,2])
 
-                final_data = []
-                frame_data = []
-                vector = []
-                optic1 = []
-                optic2 = []
-                optic3= []
+                    frame_data = []
+                    vector = []
+                    optic1 = []
+                    optic2 = []
+                    optic3= []
 
-                for (x,y,window) in self.sliding_window(frames[k][0:240, :], 60, (60,60)):
-                    hist, bin = np.histogram(window, 10)
-                    center = (bin[:-1] + bin[1:]) / 2
-                    hist_x = np.multiply(center, hist)
-                    hist_x = (hist_x- np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
-                    frame_data = np.concatenate((frame_data, hist_x))
+                    for (x,y,window) in self.sliding_window(frames[k][0:240, :], 60, (60,60)):
+                        hist, bin = np.histogram(window, 10)
+                        center = (bin[:-1] + bin[1:]) / 2
+                        hist_x = np.multiply(center, hist)
+                        hist_x = (hist_x- np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                        frame_data = np.concatenate((frame_data, hist_x))
 
-                for (x, y, window) in self.sliding_window(r[0:240, :], 60, (60, 60)):
-                    hist, bin = np.histogram(window, 10)
-                    center = (bin[:-1] + bin[1:]) / 2
-                    hist_x = np.multiply(center, hist)
-                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
-                    optic1 = np.concatenate((optic1, hist_x))
+                    for (x, y, window) in self.sliding_window(r[0:240, :], 60, (60, 60)):
+                        hist, bin = np.histogram(window, 10)
+                        center = (bin[:-1] + bin[1:]) / 2
+                        hist_x = np.multiply(center, hist)
+                        hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                        optic1 = np.concatenate((optic1, hist_x))
 
-                for (x, y, window) in self.sliding_window(b[0:240, :], 60, (60, 60)):
-                    hist, bin = np.histogram(window, 10)
-                    center = (bin[:-1] + bin[1:]) / 2
-                    hist_x = np.multiply(center, hist)
-                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
-                    optic2 = np.concatenate((optic2, hist_x))
+                    for (x, y, window) in self.sliding_window(b[0:240, :], 60, (60, 60)):
+                        hist, bin = np.histogram(window, 10)
+                        center = (bin[:-1] + bin[1:]) / 2
+                        hist_x = np.multiply(center, hist)
+                        hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                        optic2 = np.concatenate((optic2, hist_x))
 
-                for (x, y, window) in self.sliding_window(g[0:240, :], 60, (60, 60)):
-                    hist, bin = np.histogram(window, 10)
-                    center = (bin[:-1] + bin[1:]) / 2
-                    hist_x = np.multiply(center, hist)
-                    hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
-                    optic3 = np.concatenate((optic3, hist_x))
+                    for (x, y, window) in self.sliding_window(g[0:240, :], 60, (60, 60)):
+                        hist, bin = np.histogram(window, 10)
+                        center = (bin[:-1] + bin[1:]) / 2
+                        hist_x = np.multiply(center, hist)
+                        hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                        optic3 = np.concatenate((optic3, hist_x))
 
 
-                if count == 1:
-                    final_data = np.concatenate((np.reshape(wheel[k], (1,)),frame_data, optic1, optic2, optic3))
+                    if t == 0:
+                        final_data = np.concatenate((np.reshape(wheel[k], (1,)),frame_data, optic1, optic2, optic3))
 
-                else:
-                    vector = np.concatenate((np.reshape(wheel[k], (1,)), frame_data, optic1, optic2, optic3))
+                    else:
+                        vector = np.concatenate((np.reshape(wheel[k], (1,)), frame_data, optic1, optic2, optic3))
+                        final_data = np.vstack((final_data, vector))
+
+                    if fidget_vector[k] == 1:
+                        y_train.append(0)
+                    else:
+                        y_train.append(1)
+
+                    t += 1
+
 
                 k += 1
 
 
-            final_data = np.vstack((final_data, vector))
-
-
-
-        return {'feature_data': final_data}
+        return {'feature_data': final_data, 'labels': y_train}
 
     def hog(self, img):
 
