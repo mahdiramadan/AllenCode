@@ -143,7 +143,7 @@ class ClusteringVisualization:
             height = len(frames[0])
             dim = height / 2 * (width / 2)
 
-            for f in range(520,525):
+            for f in range(len(frames)):
 
 
                 # hog = self.hog(frames[f])
@@ -185,7 +185,7 @@ class ClusteringVisualization:
                 #
                 # vector = np.int16(np.hstack(( optical, angle)))
                 #
-                if movement_vector[0][f] == 1:
+                if movement_vector[0][k] == 1:
                     # if np.mean(opticals[f]) < 4:
                     #     questionable_frames.append(k)
                     first += 1
@@ -198,7 +198,7 @@ class ClusteringVisualization:
                         hist_2 = np.hstack((hist_2, self.get_mode(angles[f])))
                         hist_4 = np.hstack((hist_4, np.mean(frames[f])))
 
-                if labeled_vector[f] == 1:
+                if labeled_vector[k] == 1:
                     # if np.mean(opticals[f]) > 4:
                     #     questionable_frames.append(k)
 
