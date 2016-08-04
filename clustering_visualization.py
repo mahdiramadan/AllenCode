@@ -28,6 +28,7 @@ from scipy import ndimage
 from sklearn import neighbors, datasets
 from scipy import stats
 from mpl_toolkits.mplot3d import Axes3D
+from math import isnan
 
 
 class ClusteringVisualization:
@@ -100,12 +101,13 @@ class ClusteringVisualization:
         hf = h5py.File('data.h5', 'r')
         final_data = []
         dimension = 260*540
-        wheel = pickle.load(open('wheel.pickle', 'rb'))
+        # wheel = pickle.load(open('wheel.pickle', 'rb'))
         # wheel = preprocessing.StandardScaler().fit(wheel).transform(wheel)
         count = 0
         k = 0
         first = 0
         second = 0
+        r = []
         hist_1 = []
         hist_0 = []
         hist_2 = []
@@ -127,9 +129,14 @@ class ClusteringVisualization:
         movement_vector = []
         movement_vector.append([sum(x) for x in zip(walking, running)])
 
+        wheel = joblib.load('dxds2.pkl')
+        first_non_nan = next(x for x in wheel if not isnan(x))
+        first_index = np.where(wheel == first_non_nan)[0]
+        k = first_index[0]
+
         questionable_frames = []
 
-        for item in range(1,51):
+        for item in range(1,21):
             group = hf.get('first ' + str(item) + '000 frames')
             # optical.append(np.array(group.get('optical')))
             # angles.append(np.array(group.get('angles')))
@@ -143,7 +150,12 @@ class ClusteringVisualization:
             height = len(frames[0])
             dim = height / 2 * (width / 2)
 
-            for f in range(len(frames)):
+            if count == 1:
+                r = range(first_index[0], len(frames))
+            else:
+                r = range(len(frames))
+
+            for f in r:
 
 
                 # hog = self.hog(frames[f])
@@ -191,12 +203,10 @@ class ClusteringVisualization:
                     first += 1
                     if first == 1:
                         hist_1 = np.mean(opticals[f])
-                        hist_2 = self.get_mode(angles[f])
-                        hist_4 = np.mean(frames[f])
+                        hist_2 = wheel[k]
                     else:
                         hist_1 = np.hstack((hist_1, np.mean(opticals[f])))
-                        hist_2 = np.hstack((hist_2, self.get_mode(angles[f])))
-                        hist_4 = np.hstack((hist_4, np.mean(frames[f])))
+                        hist_2 = np.hstack((hist_2, wheel[k]))
 
                 if labeled_vector[k] == 1:
                     # if np.mean(opticals[f]) > 4:
@@ -205,12 +215,10 @@ class ClusteringVisualization:
                     second += 1
                     if second == 1:
                         hist_0 = np.mean(opticals[f])
-                        hist_3 = self.get_mode(angles[f])
-                        hist_5 = np.mean(frames[f])
+                        hist_3 = wheel[k]
                     else:
                         hist_0 = np.hstack((hist_0, np.mean(opticals[f])))
-                        hist_3 = np.hstack((hist_3, self.get_mode(angles[f])))
-                        hist_5 = np.hstack((hist_5, np.mean(frames[f])))
+                        hist_3 = np.hstack((hist_3, wheel[k]))
 
                 k += 1
 
@@ -227,18 +235,17 @@ class ClusteringVisualization:
 
         print(questionable_frames)
 
-
         x = np.mean(hist_1)
         y = np.std(hist_1)
         z = np.max(hist_1)
         print(x,y,z)
 
         fig = plt.figure(1)
-        ax = Axes3D(fig)
+        ax = fig.add_subplot(111)
         # hist_1, bin_1 = np.histogram(hist_1, 20, normed= True)
         # b_width = 0.7 * (bin_1[1] - bin_1[0])
         # center = (bin_1[:-1] + bin_1[1:]) / 2
-        ax.plot(hist_1, hist_2, hist_4, 'bo')
+        ax.plot(hist_1, hist_2, 'bo')
 
 
         x = np.mean(hist_0)
@@ -251,12 +258,12 @@ class ClusteringVisualization:
         # b_width = 0.7 * (bin_1[1] - bin_1[0])
         # center = (bin_1[:-1] + bin_1[1:]) / 2
 
-        ax.plot(hist_0, hist_3, hist_5, 'go')
-        ax.azim = 200
-        ax.elev = -45
-        ax.set_xlabel('Optical flow')
-        ax.set_ylabel('Optical Angle')
-        ax.set_zlabel('Frame HOG')
+        ax.plot(hist_0, hist_3, 'go')
+        # ax.azim = 200
+        # ax.elev = -45
+        # ax.set_xlabel('Optical flow')
+        # ax.set_ylabel('Optical Angle')
+        # ax.set_zlabel('Frame HOG')
         plt.show()
 
 
