@@ -368,7 +368,7 @@ class ExcelProcessing:
         # determines over how many frames we calculate annotation frequency
         # 147 frames is approximately 5 seconds
         interval = 147
-        interval_seconds = round(147 / fps)
+        interval_seconds = round(interval / fps)
 
         # iterate over each frame
         for k in range(len(label_data)):
@@ -396,17 +396,20 @@ class ExcelProcessing:
         ax.set_ylabel('Frequency of Occurrence')
         plt.ylim([0, (m + 50)])
 
-        self.create_stimulus_definition(m, ax, fps)
+        self.create_stimulus_definition(m, ax, fps, frequency_data, label)
 
         ax.bar(time, frequency_data)
 
         return fig1
 
-    def create_stimulus_definition(self, m, ax, fps):
+    def create_stimulus_definition(self, m, ax, fps, freq, label):
         # create CAM stimulus definition visual
 
         # get nwb file data
         nwb_file = self.open_nwb()
+
+        index = self.get_labels().index(label) + 1
+        fidget_vector = np.array(self.get_per_frame_data()[index])
 
         #types of possible stimuli
         stimuli = ['spontaneous_stimulus','drifting_gratings_stimulus','natural_movie_one_stimulus', 'natural_movie_two_stimulus',
@@ -418,7 +421,7 @@ class ExcelProcessing:
         # iterate over stimulus types, if type is found in data, then get frame durations
         for stim in stimuli:
             if stim in visual:
-
+                cqg = []
                 # get unique frame numbers
                 frames = np.unique([nwb_file['stimulus']['presentation'][stim]['frame_duration'][()]])
 
@@ -434,7 +437,7 @@ class ExcelProcessing:
 
                 # since some stimuli are on and off frequently (rect too thin), we might want rect edges so that the rect can show
                 # Because of edgecolor on
-                edgecolor = ('none','k','none','none','none','none','none')
+                edgecolor = ('y','k','none','none','none','m','none')
 
 
                 for i in range(len(frames)-1):
@@ -445,19 +448,22 @@ class ExcelProcessing:
                     # Thus, you wil never have more than 150 discrete frame ranges
                     if len(frames) < 150:
                         length = frames[i+1] - frames[i]
-                        x = frames[i] / fps
+                        x = (frames[i] / fps)
                         rectangle = plt.Rectangle((x, m + 20), length/fps, 10, fc= colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)],linewidth = 0.5)
                         plt.gca().add_patch(rectangle)
+                        cqg.append(np.sum(fidget_vector[int(frames[i]): int(frames[i+1])]))
 
                     else:
-                        x = frames[i] / fps
+                        x = (frames[i] / fps)
                         rectangle = plt.Rectangle((x, m + 20), 1 / fps, 10, fc=colors[stimuli.index(stim)], edgecolor= edgecolor[stimuli.index(stim)], linewidth = 0.2)
                         plt.gca().add_patch(rectangle)
+                        cqg.append(np.sum(fidget_vector[int(frames[i]) : int(frames[i+1])]))
 
             # if type if not in data, take next type
             else:
                 continue
-
+            sum = np.sum(cqg)
+            print (str(stim) + ' has '+ str(sum) + str(label))
 
 
     def open_nwb(self):
