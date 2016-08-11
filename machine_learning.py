@@ -39,13 +39,13 @@ def run_svm(input):
     #
     # y_train = input['labels'][0:train]
     # y_test = input['labels'][train:rows_n]
-    X_train, X_test, y_train, y_test = train_test_split(input['feature_data'], input['labels'], test_size=0.4, random_state= 40)
+    X_train, X_test, y_train, y_test = train_test_split(input['feature_data'], input['labels'], test_size=0.35, random_state= 38)
 
     # Set the parameters by cross-validation
-    tuned_parameters = [{'kernel': ['rbf'], 'gamma': [ 1e-1, 1e-2, 1e-3],
-                         'C': [ 1, 10, 50, 100]}]
+    tuned_parameters = [{'kernel': ['rbf'], 'gamma': [ 1e-3],
+                         'C': [ 5, 8, 10]}]
 
-    scores = ['precision']
+    scores = ['f1_weighted']
 
     for score in scores:
         print("# Tuning hyper-parameters for %s" % score)
@@ -127,7 +127,7 @@ def get_data(ep):
     hsv[..., 1] = 255
 
 
-    for item in range(1, 101):
+    for item in range(1, 26):
         group = hf.get('first ' + str(item) + '000 frames')
         # optical.append(np.array(group.get('optical')))
         # angles.append(np.array(group.get('angles')))
@@ -193,99 +193,141 @@ def get_data(ep):
             # angle = (angle - angle.min()) / (angle.max() - angle.min()+ 10**-10)
             #
             # vector = np.int16(np.hstack(( optical, angle)))
-            if g <= 3000:
-                if fidget_vector[k] == 1 or movement_vector[0][k] == 1:
-                    # hsv[..., 0] = angles[k]
-                    # hsv[..., 2] = cv2.normalize(opticals[k], None, 0, 255, cv2.NORM_MINMAX)
-                    # hsv = np.float32(hsv)
-                    # rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-                    #
-                    # r = np.int64(rgb[:,:,0])
-                    # # x = x[np.nonzero(x)]
-                    # b = np.int64(rgb[:,:,1])
-                    # g = np.int64(rgb[:,:,2])
-                    #
-                    frame_data = []
-                    # vector = []
-                    optic1 = []
-                    optic2 = []
-                    # optic3= []
+            # if g <= 3000:
+            if fidget_vector[k] == 1 or movement_vector[0][k] == 1:
+                # hsv[..., 0] = angles[k]
+                # hsv[..., 2] = cv2.normalize(opticals[k], None, 0, 255, cv2.NORM_MINMAX)
+                # hsv = np.float32(hsv)
+                # rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+                #
+                # r = np.int64(rgb[:,:,0])
+                # # x = x[np.nonzero(x)]
+                # b = np.int64(rgb[:,:,1])
+                # g = np.int64(rgb[:,:,2])
+                #
+                frame_data = []
+                # vector = []
+                optic1 = []
+                optic2 = []
+                # optic3= []
 
-                    for (x,y,window) in sliding_window(frames[f][0:240, :], 30, (30,30)):
-                        hist, bin = np.histogram(window, 10)
-                        center = (bin[:-1] + bin[1:]) / 2
-                        hist_x = np.multiply(center, hist)
-                        hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
-                        frame_data = np.concatenate((frame_data, hist_x))
+                for (x,y,window) in sliding_window(frames[f][0:240, :], 30, (30,30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
+                    frame_data = np.concatenate((frame_data, hist_x))
 
-                    for (x, y, window) in sliding_window(opticals[f][0:240, :], 30, (30, 30)):
-                        hist, bin = np.histogram(window, 10)
-                        center = (bin[:-1] + bin[1:]) / 2
-                        hist_x = np.multiply(center, hist)
-                        hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
-                        optic1 = np.concatenate((optic1, hist_x))
+                for (x, y, window) in sliding_window(opticals[f][0:240, :], 30, (30, 30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
+                    optic1 = np.concatenate((optic1, hist_x))
 
-                    for (x, y, window) in sliding_window(angles[f][0:240, :], 30, (30, 30)):
-                        hist, bin = np.histogram(window, 10)
-                        center = (bin[:-1] + bin[1:]) / 2
-                        hist_x = np.multiply(center, hist)
-                        hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
-                        optic2 = np.concatenate((optic2, hist_x))
+                for (x, y, window) in sliding_window(angles[f][0:240, :], 30, (30, 30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1,1)).fit(hist_x).transform(hist_x)
+                    optic2 = np.concatenate((optic2, hist_x))
 
-                    # for (x, y, window) in self.sliding_window(g[0:240, :], 60, (60, 60)):
-                    #     hist, bin = np.histogram(window, 10)
-                    #     center = (bin[:-1] + bin[1:]) / 2
-                    #     hist_x = np.multiply(center, hist)
-                    #     hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
-                    #     optic3 = np.concatenate((optic3, hist_x))
+                # for (x, y, window) in self.sliding_window(g[0:240, :], 60, (60, 60)):
+                #     hist, bin = np.histogram(window, 10)
+                #     center = (bin[:-1] + bin[1:]) / 2
+                #     hist_x = np.multiply(center, hist)
+                #     hist_x = (hist_x - np.min(hist_x)) / (np.max(hist_x) - np.min(hist_x) + 10 ** -10)
+                #     optic3 = np.concatenate((optic3, hist_x))
 
 
-                    if t == 0:
-                        final_data = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
+                if t == 0:
+                    final_data = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
 
-                    else:
-                        vector = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
-                        final_data = np.vstack((final_data, vector))
+                else:
+                    vector = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
+                    final_data = np.vstack((final_data, vector))
 
-                    if fidget_vector[k] == 1:
-                        y_train.append(0)
-                    else:
-                        g += 1
-                        y_train.append(1)
+                if fidget_vector[k] == 1:
+                    y_train.append(0)
+                else:
+                    g += 1
+                    y_train.append(1)
 
-                    t += 1
+                t += 1
 
-                if g > 3000:
-                    if fidget_vector[k] == 1:
-                        optic1 = []
-                        optic2 = []
-                        frame_data = []
-                        # optic3= []
 
-                        for (x, y, window) in sliding_window(frames[f][0:240, :], 30, (30, 30)):
-                            hist, bin = np.histogram(window, 10)
-                            center = (bin[:-1] + bin[1:]) / 2
-                            hist_x = np.multiply(center, hist)
-                            hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
-                            frame_data = np.concatenate((frame_data, hist_x))
+            else:
 
-                        for (x, y, window) in sliding_window(opticals[f][0:240, :], 30, (30, 30)):
-                            hist, bin = np.histogram(window, 10)
-                            center = (bin[:-1] + bin[1:]) / 2
-                            hist_x = np.multiply(center, hist)
-                            hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
-                            optic1 = np.concatenate((optic1, hist_x))
+                frame_data = []
+                # vector = []
+                optic1 = []
+                optic2 = []
+                # optic3= []
 
-                        for (x, y, window) in sliding_window(angles[f][0:240, :], 30, (30, 30)):
-                            hist, bin = np.histogram(window, 10)
-                            center = (bin[:-1] + bin[1:]) / 2
-                            hist_x = np.multiply(center, hist)
-                            hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
-                            optic2 = np.concatenate((optic2, hist_x))
+                for (x, y, window) in sliding_window(frames[f][0:240, :], 30, (30, 30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                    frame_data = np.concatenate((frame_data, hist_x))
 
-                        vector = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
-                        final_data = np.vstack((final_data, vector))
-                        y_train.append(0)
+                for (x, y, window) in sliding_window(opticals[f][0:240, :], 30, (30, 30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                    optic1 = np.concatenate((optic1, hist_x))
+
+                for (x, y, window) in sliding_window(angles[f][0:240, :], 30, (30, 30)):
+                    hist, bin = np.histogram(window, 10)
+                    center = (bin[:-1] + bin[1:]) / 2
+                    hist_x = np.multiply(center, hist)
+                    hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                    optic2 = np.concatenate((optic2, hist_x))
+
+                if t == 0:
+                    final_data = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
+
+                else:
+                    vector = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
+                    final_data = np.vstack((final_data, vector))
+
+                y_train.append(2)
+
+
+                t += 1
+
+                # if g > 3000:
+                #     if fidget_vector[k] == 1:
+                #         optic1 = []
+                #         optic2 = []
+                #         frame_data = []
+                #         # optic3= []
+                #
+                #         for (x, y, window) in sliding_window(frames[f][0:240, :], 30, (30, 30)):
+                #             hist, bin = np.histogram(window, 10)
+                #             center = (bin[:-1] + bin[1:]) / 2
+                #             hist_x = np.multiply(center, hist)
+                #             hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                #             frame_data = np.concatenate((frame_data, hist_x))
+                #
+                #         for (x, y, window) in sliding_window(opticals[f][0:240, :], 30, (30, 30)):
+                #             hist, bin = np.histogram(window, 10)
+                #             center = (bin[:-1] + bin[1:]) / 2
+                #             hist_x = np.multiply(center, hist)
+                #             hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                #             optic1 = np.concatenate((optic1, hist_x))
+                #
+                #         for (x, y, window) in sliding_window(angles[f][0:240, :], 30, (30, 30)):
+                #             hist, bin = np.histogram(window, 10)
+                #             center = (bin[:-1] + bin[1:]) / 2
+                #             hist_x = np.multiply(center, hist)
+                #             hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+                #             optic2 = np.concatenate((optic2, hist_x))
+                #
+                #         vector = np.concatenate((np.reshape(wheel[k], (1)), optic1, optic2, frame_data))
+                #         final_data = np.vstack((final_data, vector))
+                #         y_train.append(0)
 
 
             k += 1
