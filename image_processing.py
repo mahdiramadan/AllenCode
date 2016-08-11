@@ -14,93 +14,118 @@ import pandas
 import time
 import tables
 import h5py
+from sklearn import preprocessing
+from multiprocessing import Pool
+import warnings
 
 
-class ImageProcessing:
-    def __init__(self, exp_folder, lims_ID):
 
-        for file in os.listdir(exp_folder):
-            # looks for the excel file and makes the directory to it
-            if file.endswith(".mp4") and file.startswith(lims_ID):
-                self.directory = exp_folder
-                self.file_string = os.path.join(exp_folder, file)
-                self.sb = sb(exp_folder)
-                self.wd = wd(exp_folder, lims_ID)
-                self.ep = ep(exp_folder, lims_ID)
-                self.sv = sv(exp_folder, lims_ID)
-                self.video_pointer = cv2.VideoCapture(self.file_string)
+def show_frame(frame):
+    cv2.imshow('image', frame)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
-        if os.path.isfile(self.file_string):
-            self.data_present = True
-        else:
-            self.data_present = False
+def run_whole_video(exp_folder, lims_ID):
 
-    def is_valid(self):
-        return self.data_present
+    file_string = get_file_string(exp_folder, lims_ID)
+    video_pointer = cv2.VideoCapture(file_string)
 
-    def show_frame(self, frame):
-        cv2.imshow('image', frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    hf = h5py.File('data_'+str(lims_ID)+'.h5', 'w')
 
-    def run_whole_video(self):
-
-        # wheel_data = self.wd.normalize_wheel_data()
-
-        hf = h5py.File('data.h5', 'w')
-
-        # self.video_pointer.set(1, 30000)
-        ret, frame = self.video_pointer.read()
-
-        frame = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
-
-        prvs = frame
-        next = frame
-
-        count = 0
-        mod = 0
-        opticals = []
-        angles = []
-        frames = []
-
-        limit = self.wd.wheel_data_length()
-
-        while count <= limit:
-            if count > 0:
-                if count%1000 == 0 or count == limit:
-                    mod += 1
-                    g = hf.create_group('first ' + str(mod) + '000 frames')
-                    g.create_dataset('frames', data=frames, compression="gzip", compression_opts=9)
-                    g.create_dataset('optical', data=opticals, compression="gzip", compression_opts=9)
-                    g.create_dataset('angles', data=angles, compression="gzip", compression_opts=9)
+    # self.video_pointer.set(1, 41000)
+    ret, frame = video_pointer.read()
 
 
-                    frames = []
-                    opticals = []
-                    angles = []
+    frame = cv2.cvtColor(frame[160:400, 100:640], cv2.COLOR_BGR2GRAY)
 
-            prvs = next
-            frames.append(prvs)
+    prvs = frame
+    next = frame
 
-            ret, frame = self.video_pointer.read()
-            next = cv2.cvtColor(frame[160:420, 100:640], cv2.COLOR_BGR2GRAY)
-
-            optical = self.optical_flow(prvs, next)
-            opticals.append(optical['mag'])
-            angles.append(optical['ang'])
-
-            count += 1
-
-            if count%1000 == 0:
-                print (count)
-
-    def optical_flow(self, prvs, next):
+    count = 0
+    mod = 0
+    opticals = []
+    angles = []
+    frames = []
 
 
-        flow = cv2.calcOpticalFlowFarneback(prvs, next, 0.5, 3, 15, 3, 5, 1.2, 0)
-        mag, ang= cv2.cartToPolar(flow[..., 0], flow[..., 1])
+    limit = int(video_pointer.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
 
-        mag = np.int16(mag)
-        ang = np.int16(ang*180/np.pi/2)
+    while count <= limit:
+        if count > 0:
+            if count%1000 == 0 or count == limit:
+                mod += 1
+                g = hf.create_group('first ' + str(mod) + '000 frames')
+                g.create_dataset('frames', data=frames, compression="gzip", compression_opts=9)
+                g.create_dataset('optical', data=opticals, compression="gzip", compression_opts=9)
+                g.create_dataset('angles', data=angles, compression="gzip", compression_opts=9)
 
-        return {'mag': mag, 'ang': ang}
+
+                frames = []
+                opticals = []
+                angles = []
+
+        prvs = next
+        frames.append(process_input(prvs))
+
+        ret, frame = video_pointer.read()
+        next = cv2.cvtColor(frame[160:400, 100:640], cv2.COLOR_BGR2GRAY)
+
+        optical = optical_flow(prvs, next)
+        opticals.append(optical['mag'])
+        angles.append(optical['ang'])
+
+        count += 1
+
+        if count%1000 == 0:
+            print (count)
+
+def optical_flow(prvs, next):
+
+
+    flow = cv2.calcOpticalFlowFarneback(prvs, next, 0.5, 3, 15, 3, 5, 1.2, 0)
+    mag, ang= cv2.cartToPolar(flow[..., 0], flow[..., 1])
+
+    mag = process_input(mag)
+    ang = process_input((ang*180/np.pi/2))
+
+    return {'mag': mag, 'ang': ang}
+
+def process_input(input):
+
+    frame_data = []
+
+    for (x, y, window) in sliding_window(input, 30, (30, 30)):
+        hist, bin = np.histogram(window, 10)
+        center = (bin[:-1] + bin[1:]) / 2
+        hist_x = np.multiply(center, hist)
+        hist_x = preprocessing.MinMaxScaler((-1, 1)).fit(hist_x).transform(hist_x)
+        frame_data = np.concatenate((frame_data, hist_x))
+    return frame_data
+
+def sliding_window(image, stepSize, windowSize):
+    # slide a window across the image
+    for y in xrange(0, image.shape[0], stepSize):
+        for x in xrange(0, image.shape[1], stepSize):
+            # yield the current window
+            yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+
+def get_file_string(exp_folder,lims_ID):
+
+    for file in os.listdir(exp_folder):
+        if file.endswith(".mp4") and file.startswith(lims_ID):
+            file_string = os.path.join(exp_folder, file)
+            return file_string
+
+
+
+if __name__ == '__main__':
+
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    exp_folder = '/Users/mahdiramadan/Documents/Allen_Institute/code_repository/Data/501560436'
+    lims_ID = '501560436'
+    run_whole_video(exp_folder, lims_ID)
+
+    # p = Process(target=run_whole_video(video_pointer, lims_ID), args= (video_pointer, lims_ID))
+    # p.start()
+    # p.join()
+
