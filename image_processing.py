@@ -65,11 +65,11 @@ def run_whole_video(exp_folder, lims_ID):
     # create hdf file
     hf = h5py.File('data_' + str(lims_ID) + '.h5', 'w')
     g = hf.create_group('feature space')
-    vector = np.zeros((100000, 4321))
-    table = g.create_dataset('features', data=vector, compression='gzip', compression_opts=9, shape=(100000, 4321))
+    vector = np.zeros((limit, 4321))
+    table = g.create_dataset('features', data = vector, shape =(limit, 4321))
 
 
-    while count <= 10000:
+    while count <= limit:
 
         prvs = nex
         frames = process_input(prvs)
@@ -82,10 +82,9 @@ def run_whole_video(exp_folder, lims_ID):
         angles= optical['ang']
         vector_data = np.concatenate((np.reshape(wheel[k], (1)), frames, opticals, angles))
 
-        table[count, :] = np.float16(vector_data)
+        table[count, :] = vector_data
 
         count += 1
-
 
         if count%1000 == 0:
             print (count)
